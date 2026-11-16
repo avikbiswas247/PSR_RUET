@@ -34,3 +34,8 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+## Cloudinary media setup
+
+Set these server-only environment variables: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`. `POST /api/media/upload` accepts `multipart/form-data` with a `file` field. It requires an authenticated `PHOTOGRAPHER` or `ADMIN` account, accepts JPEG/PNG/WebP/GIF/AVIF images up to 10 MB, uploads to the `psru` Cloudinary folder, and stores the verified secure URL and public ID in `media_assets`. `GET /api/media/:mediaId` redirects to the stored Cloudinary image URL.

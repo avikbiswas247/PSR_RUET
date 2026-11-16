@@ -1,0 +1,8 @@
+import * as Repo from "@/lib/repositories/event.repository";
+import { requireUser, requireRole, isResponse } from "@/lib/api/guards";
+import { handleApiError, jsonOk, readJson } from "@/lib/api/http";
+import { isCloudinaryImageUrl } from "@/lib/services/media.service";
+type Context = { params: Promise<{ id: string }> };
+async function admin() { const user = await requireUser(); if (isResponse(user)) return user; const denied = requireRole(user, "ADMIN"); return denied ?? user; }
+export async function PATCH(request: Request, context: Context) { try { const auth = await admin(); if (isResponse(auth)) return auth; const { id } = await context.params; const b = await readJson<Record<string, unknown>>(request); const patch: Record<string, unknown> = {}; for (const k of ["title", "slug", "description", "cover_image_url", "location", "start_at", "end_at", "registration_enabled", "status"]) if (k in b) patch[k] = b[k]; if (typeof patch.title === "string") patch.title = patch.title.trim(); if (typeof patch.slug === "string" && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(patch.slug)) return jsonOk({ message: "Use a URL-safe slug." }, 422); if (patch.cover_image_url !== undefined && patch.cover_image_url !== null && !isCloudinaryImageUrl(patch.cover_image_url)) return jsonOk({ message: "Upload a valid Cloudinary cover image." }, 422); return jsonOk(await Repo.updateEvent(id, patch)); } catch (e) { return handleApiError(e); } }
+export async function DELETE(_request: Request, context: Context) { try { const auth = await admin(); if (isResponse(auth)) return auth; const { id } = await context.params; if (!(await Repo.deleteEvent(id))) return jsonOk({ message: "Event not found." }, 404); return jsonOk({ deleted: true }); } catch (e) { return handleApiError(e); } }
