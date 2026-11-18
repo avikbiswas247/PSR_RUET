@@ -30,6 +30,36 @@ export interface PublicPortfolio {
   photographer_avatar_url?: string | null;
 }
 
+export interface CommunityProfile {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  roles: string[];
+  title: string | null;
+  bio: string | null;
+  location: string | null;
+  instagram_url: string | null;
+  website_url: string | null;
+  device: string | null;
+  photography_genre: string | null;
+  created_at: string | Date;
+  photo_count: number;
+  portfolio_count: number;
+}
+
+export interface CommunityProfilePhoto {
+  id: string;
+  title: string | null;
+  description: string | null;
+  image_url: string;
+  thumbnail_url: string | null;
+  created_at: string | Date;
+}
+
+export interface CommunityProfileDetail extends CommunityProfile {
+  photos: CommunityProfilePhoto[];
+}
+
 export interface PublicPhoto {
   id: string;
   photographer_id: string;

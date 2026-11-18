@@ -14,3 +14,4 @@ export * as AvailabilityService from "./availability.service";
 export * as AdminAuthService from "./admin-auth.service";
 export * as AdminService from "./admin.service";
 export * as PhotographerService from "./photographer.service";
+export * as CommunityProfileService from "./community-profile.service";
