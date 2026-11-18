@@ -37,8 +37,8 @@ export function CommunityProfileCard({ profile }: { profile: CommunityProfile })
           </div>
         </div>
 
-        <div className="px-5 pb-5 sm:px-6 sm:pb-6">
-          <div className="-mt-11 mb-4 flex items-end justify-between gap-3">
+        <div className="px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
             {profile.avatar_url && !avatarFailed ? (
               <img
                 src={profile.avatar_url}
@@ -46,7 +46,7 @@ export function CommunityProfileCard({ profile }: { profile: CommunityProfile })
                 loading="lazy"
                 decoding="async"
                 onError={() => setAvatarFailed(true)}
-                className="h-[88px] w-[88px] rounded-full border-4 border-surface bg-surface-2 object-cover shadow-lg"
+                className="h-[88px] w-[88px] rounded-full border-4 border-surface bg-surface-2 object-contain shadow-lg"
               />
             ) : (
               <span aria-hidden="true" className="flex h-[88px] w-[88px] items-center justify-center rounded-full border-4 border-surface bg-orange/15 text-2xl font-bold text-orange shadow-lg">

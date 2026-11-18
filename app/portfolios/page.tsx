@@ -3,15 +3,11 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { SkipToContent } from "@/components/layout/skip-to-content";
-import { PortfolioGrid } from "@/components/portfolios/portfolio-grid";
 import { CommunityProfileGrid } from "@/components/portfolios/community-profile-grid";
-import { CommunityProfile, PublicPortfolio } from "@/lib/types/public";
+import { CommunityProfile } from "@/lib/types/public";
 import { useApi } from "@/lib/hooks/use-api";
 
 export default function PortfoliosPage() {
-  const { data, loading, error } = useApi<PublicPortfolio[]>(
-    "/api/portfolios"
-  );
   const {
     data: profiles,
     loading: profilesLoading,
@@ -31,14 +27,9 @@ export default function PortfoliosPage() {
         Portfolios
       </h1>
       <p className="mb-10 max-w-[640px] text-base text-muted sm:text-lg">
-        Discover PSR&rsquo;s members, photographers, and administrators through their profiles and shared photographic work.
+        Discover PSR&rsquo;s members, photographers, and administrators through their community profiles.
       </p>
-      {error && (
-        <div className="mb-8 p-4 rounded-sm border border-orange/30 bg-orange/5 text-orange-deep text-sm">
-          {error}
-        </div>
-      )}
-      <section className="mb-16">
+      <section>
         <div className="mb-6">
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-orange">The people behind PSR</p>
           <h2 className="text-2xl font-semibold tracking-tight text-text sm:text-3xl">Community profiles</h2>
@@ -54,16 +45,6 @@ export default function PortfoliosPage() {
         <CommunityProfileGrid profiles={profilesLoading ? [] : (profiles ?? [])} loading={profilesLoading} />
       </section>
 
-      <section>
-        <div className="mb-6">
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-orange">Curated collections</p>
-          <h2 className="text-2xl font-semibold tracking-tight text-text sm:text-3xl">Portfolios</h2>
-        </div>
-        <PortfolioGrid
-          portfolios={loading ? [] : (data ?? [])}
-          loading={loading}
-        />
-      </section>
     </PageContainer>
   );
 }

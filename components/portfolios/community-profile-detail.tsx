@@ -130,16 +130,16 @@ export function CommunityProfileDetail({ userId }: { userId: string }) {
           </div>
 
           <div className="px-5 pb-6 sm:px-8 sm:pb-8">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div className="-mt-12 flex min-w-0 items-end gap-4 sm:-mt-16 sm:gap-5">
+            <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4 sm:gap-5">
                 {profile.avatar_url && !avatarFailed ? (
-                  <img src={profile.avatar_url} alt={name} onError={() => setAvatarFailed(true)} className="h-24 w-24 shrink-0 rounded-full border-4 border-surface bg-surface-2 object-cover shadow-xl sm:h-32 sm:w-32" />
+                  <img src={profile.avatar_url} alt={name} onError={() => setAvatarFailed(true)} className="h-24 w-24 shrink-0 rounded-full border-4 border-surface bg-surface-2 object-contain shadow-xl sm:h-32 sm:w-32" />
                 ) : (
                   <span aria-hidden="true" className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-surface bg-orange/15 text-3xl font-bold text-orange shadow-xl sm:h-32 sm:w-32 sm:text-4xl">
                     {initials || "P"}
                   </span>
                 )}
-                <div className="min-w-0 pb-1 sm:pb-2">
+                <div className="min-w-0">
                   <h1 className="break-words text-2xl font-bold leading-tight tracking-tight text-text [overflow-wrap:anywhere] sm:text-4xl">{name}</h1>
                   {profile.title && <p className="mt-1 break-words text-sm font-medium text-orange [overflow-wrap:anywhere] sm:text-base">{profile.title}</p>}
                 </div>
