@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/providers/auth-provider";
+import { AuthFlowError, useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getRoleHomePath } from "@/lib/auth/role-home";
@@ -30,16 +30,17 @@ export default function SignInPage() {
     const password = form.get("password") as string;
     try {
       if (mode === "register") {
-        await signUp(fullName, email, password);
-        setNotice("Account created successfully! Redirecting to sign in...");
-        setTimeout(() => {
-          router.push("/sign-in");
-        }, 1500);
+        const result = await signUp(fullName, email, password);
+        router.push(`/verify-email?userId=${encodeURIComponent(result.userId)}&email=${encodeURIComponent(result.email)}&sent=${result.verificationEmailSent ? "1" : "0"}`);
       } else {
         const user = await signIn(email, password);
         if (user) router.push(getRoleHomePath(user.roles));
       }
     } catch (err) {
+      if (err instanceof AuthFlowError && err.code === "EMAIL_NOT_VERIFIED" && err.userId) {
+        router.push(`/verify-email?userId=${encodeURIComponent(err.userId)}&email=${encodeURIComponent(email)}&sent=${err.verificationEmailSent ? "1" : "0"}`);
+        return;
+      }
       setNotice(err instanceof Error ? err.message : "Unable to continue.");
     } finally {
       setBusy(false);
@@ -81,6 +82,14 @@ export default function SignInPage() {
             placeholder="you@example.com"
             className="mb-6"
           />
+
+          {mode === "login" && (
+            <div className="-mt-4 mb-2 text-right">
+              <Link href="/forgot-password" className="text-sm text-muted hover:text-orange transition-colors">
+                Forgot password?
+              </Link>
+            </div>
+          )}
           <Input
             label="Password"
             type="password"

@@ -18,6 +18,9 @@ export function markPasswordResetTokenUsed(id: string) {
     "UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1 AND used_at IS NULL RETURNING *", [id],
   );
 }
+export function invalidatePasswordResetTokensForUser(userId: string) {
+  return run("UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL", [userId]);
+}
 export function deleteExpiredPasswordResetTokens() {
   return run("DELETE FROM password_reset_tokens WHERE expires_at <= NOW() OR used_at IS NOT NULL");
 }

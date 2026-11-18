@@ -9,13 +9,14 @@ export interface User {
   phone: string | null;
   is_active: boolean;
   email_verified_at: string | Date | null;
+  deleted_at: string | Date | null;
   created_at: string | Date;
   updated_at: string | Date;
 }
 
 const TABLE = "users";
-const CREATE_COLUMNS = ["full_name", "email", "password_hash", "avatar_url", "phone", "is_active", "email_verified_at"] as const;
-const UPDATE_COLUMNS = ["full_name", "email", "password_hash", "avatar_url", "phone", "is_active", "email_verified_at"] as const;
+const CREATE_COLUMNS = ["full_name", "email", "password_hash", "avatar_url", "phone", "is_active", "email_verified_at", "deleted_at"] as const;
+const UPDATE_COLUMNS = ["full_name", "email", "password_hash", "avatar_url", "phone", "is_active", "email_verified_at", "deleted_at"] as const;
 
 export function getUserById(id: string) {
   return byId<User>(TABLE, id);
@@ -29,7 +30,7 @@ export function createUser(input: Pick<User, "full_name" | "email" | "password_h
   return insertRow<User>(TABLE, input as Record<string, unknown>, CREATE_COLUMNS);
 }
 
-export function updateUser(id: string, patch: Partial<Pick<User, "full_name" | "email" | "password_hash" | "avatar_url" | "phone" | "is_active" | "email_verified_at">>) {
+export function updateUser(id: string, patch: Partial<Pick<User, "full_name" | "email" | "password_hash" | "avatar_url" | "phone" | "is_active" | "email_verified_at" | "deleted_at">>) {
   return updateRow<User>(TABLE, id, patch as Record<string, unknown>, UPDATE_COLUMNS);
 }
 

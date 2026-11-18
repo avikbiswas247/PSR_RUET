@@ -1,6 +1,5 @@
 import { AdminAuthService } from "@/lib/services";
 import { handleApiError, jsonOk, readJson } from "@/lib/api/http";
-import { sendAdminOtpEmail } from "@/lib/email/send-admin-otp";
 
 type Body = { bootstrapSecret?: string; username?: string; email?: string; password?: string };
 
@@ -17,21 +16,13 @@ export async function POST(request: Request) {
       password: body.password,
     });
     // Send OTP for email verification
-    const otp = await AdminAuthService.generateOtp({
-      userId: user.id,
-      purpose: "email_verification",
-    });
+    let verificationEmailSent = true;
     try {
-      await sendAdminOtpEmail({
-        to: user.email,
-        userId: user.id,
-        code: otp.code,
-        purpose: "email_verification",
-        expiresInMinutes: 10,
-      });
+      await AdminAuthService.sendOtpEmail({ userId: user.id, purpose: "email_verification" });
     } catch (mailErr) {
       console.error("[AdminBootstrap] OTP mail send failed:", mailErr instanceof Error ? mailErr.message : mailErr);
+      verificationEmailSent = false;
     }
-    return jsonOk({ message: "First administrator account created. Please verify your email.", userId: user.id, user }, 201);
+    return jsonOk({ message: "First administrator account created. Please verify your email.", userId: user.id, user, verificationEmailSent }, 201);
   } catch (error) { return handleApiError(error); }
 }

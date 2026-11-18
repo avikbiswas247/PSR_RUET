@@ -70,7 +70,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           <p className="text-muted text-lg mb-8">
             Your password has been reset successfully. You can now sign in with your new password.
           </p>
-          <Link href="#" className="button button-primary" onClick={(e) => { e.preventDefault(); }}>Sign in</Link>
+          <Link href="/sign-in" className="button button-primary">Sign in</Link>
         </div>
       )}
     </main>

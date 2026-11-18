@@ -16,7 +16,13 @@ export async function listPublicPhotos(limit = 50, offset = 0) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {
     throw new Error("Invalid pagination.");
   }
-  return PhotoRepo.listPhotos(limit, offset);
+  return PhotoRepo.listPublicPhotos(limit, offset);
+}
+export async function listPublicPhotosForPhotographer(photographerId: string, limit = 50, offset = 0) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {
+    throw new Error("Invalid pagination.");
+  }
+  return PhotoRepo.listPublicPhotosForPhotographer(photographerId, limit, offset);
 }
 export async function listMyPhotos(photographerId: string, limit = 50, offset = 0) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {

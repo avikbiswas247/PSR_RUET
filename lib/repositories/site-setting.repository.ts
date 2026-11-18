@@ -17,11 +17,11 @@ export function getSiteSettingById(id: string) {
 }
 
 export function getSiteSettingByKey(key: string) {
-  return one<SiteSetting>(`SELECT * FROM ${TABLE} WHERE "key" = $1 ORDER BY created_at ASC LIMIT 1`, [key]);
+  return one<SiteSetting>(`SELECT * FROM ${TABLE} WHERE "key" = $1 ORDER BY id ASC LIMIT 1`, [key]);
 }
 
 export function listSiteSettings(limit = 50, offset = 0) {
-  return many<SiteSetting>(`SELECT * FROM ${TABLE} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]);
+  return many<SiteSetting>(`SELECT * FROM ${TABLE} ORDER BY "key" ASC, id ASC LIMIT $1 OFFSET $2`, [limit, offset]);
 }
 
 export function createSiteSetting(input: Pick<SiteSetting, "key" | "value" | "description">) {

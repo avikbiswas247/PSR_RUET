@@ -30,7 +30,9 @@ export function listPublicPortfolios(limit = 50, offset = 0) {
   return many<Portfolio>(
     `SELECT p.*, u.full_name AS photographer_name, u.avatar_url AS photographer_avatar_url
      FROM ${TABLE} p LEFT JOIN users u ON u.id = p.photographer_id
-     WHERE p.is_public = TRUE ORDER BY p.created_at DESC LIMIT $1 OFFSET $2`,
+     WHERE p.is_public = TRUE AND u.is_active = TRUE
+       AND u.deleted_at IS NULL AND u.email_verified_at IS NOT NULL
+     ORDER BY p.created_at DESC LIMIT $1 OFFSET $2`,
     [limit, offset],
   );
 }

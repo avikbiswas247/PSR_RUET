@@ -1,5 +1,6 @@
 import { PhotoService } from "@/lib/services";
 import { getPhotographerProfileById } from "@/lib/repositories/photographer-profile.repository";
+import { getUserById } from "@/lib/repositories/user.repository";
 import { requireUser, requireRole, isResponse } from "@/lib/api/guards";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getPagination, handleApiError, jsonOk, readJson } from "@/lib/api/http";
@@ -28,7 +29,11 @@ export async function GET(request: Request) {
       if (!profile || !profile.user_id) {
         return jsonOk([]);
       }
-      const photos = await PhotoService.listMyPhotos(profile.user_id, limit, offset);
+      const owner = await getUserById(profile.user_id);
+      if (!owner || !owner.is_active || owner.deleted_at || !owner.email_verified_at) return jsonOk([]);
+      const photos = user?.id === profile.user_id && user.roles.includes("PHOTOGRAPHER")
+        ? await PhotoService.listMyPhotos(profile.user_id, limit, offset)
+        : await PhotoService.listPublicPhotosForPhotographer(profile.user_id, limit, offset);
       return jsonOk(photos);
     }
     if (user && user.roles.includes("PHOTOGRAPHER")) {

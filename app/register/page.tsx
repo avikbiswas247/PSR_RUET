@@ -27,11 +27,8 @@ export default function RegisterPage() {
     const email = form.get("email") as string;
     const password = form.get("password") as string;
     try {
-      await signUp(fullName, email, password, role);
-      setNotice("Account created successfully! Redirecting to sign in...");
-      setTimeout(() => {
-        router.push("/sign-in");
-      }, 1500);
+      const result = await signUp(fullName, email, password, role);
+      router.push(`/verify-email?userId=${encodeURIComponent(result.userId)}&email=${encodeURIComponent(result.email)}&sent=${result.verificationEmailSent ? "1" : "0"}`);
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Unable to create account.");
       setBusy(false);

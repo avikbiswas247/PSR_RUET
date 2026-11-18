@@ -12,6 +12,7 @@ interface AdminUser {
   is_active: boolean;
   roles: string[];
   created_at: string | Date;
+  deleted_at: string | Date | null;
 }
 
 const roles = ["ADMIN", "PHOTOGRAPHER", "MEMBER", "CLIENT"];
@@ -88,6 +89,31 @@ export default function AdminUsersPage() {
     []
   );
 
+  const deleteAccount = useCallback(async (id: string) => {
+    if (!window.confirm("Delete this account? Sign-in access will be revoked, personal details anonymized, and public profile content hidden. This action cannot be undone.")) return;
+    setBusy((prev) => new Set([...prev, id]));
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || json.data?.message || "Unable to delete account.");
+      const deleted = json.data as Pick<AdminUser, "id" | "full_name" | "email" | "is_active" | "deleted_at">;
+      setDisplayUsers((list) => list.map((user) => user.id === id ? { ...user, ...deleted } : user));
+      setNotice("Account deleted and personal details anonymized.");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Please try again.");
+    } finally {
+      setBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, []);
+
   const users = loading ? [] : displayUsers;
 
   if (loading) {
@@ -126,7 +152,10 @@ export default function AdminUsersPage() {
           <div key={u.id} className="p-4 rounded-sm border line-border bg-surface">
             <div className="flex items-center justify-between gap-3 mb-2">
               <div>
-                <h3 className="text-sm font-bold">{u.full_name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold">{u.full_name}</h3>
+                  {u.deleted_at && <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-red-400">Deleted</span>}
+                </div>
                 <p className="text-xs text-muted">{u.email}</p>
               </div>
               <div className="flex gap-2">
@@ -134,7 +163,7 @@ export default function AdminUsersPage() {
                   <button
                     key={role}
                     onClick={() => changeRole(u.id, role, u.roles.includes(role) ? "REVOKE" : "ASSIGN")}
-                    disabled={busy.has(u.id) || (u.id === currentUser?.id && role === "ADMIN" && u.roles.includes("ADMIN"))}
+                    disabled={busy.has(u.id) || !!u.deleted_at || (u.id === currentUser?.id && role === "ADMIN" && u.roles.includes("ADMIN"))}
                     className={`text-[10px] uppercase tracking-wider font-bold border rounded px-2 py-1 ${
                       u.roles.includes(role) ? "text-orange bg-orange/10 border border-orange/20" : "text-muted border-line-border"
                     }`}
@@ -144,13 +173,22 @@ export default function AdminUsersPage() {
                 ))}
               </div>
             </div>
-            <button
-              onClick={() => toggleActive(u.id, !u.is_active)}
-              disabled={busy.has(u.id) || (u.id === currentUser?.id && u.is_active)}
-              className="button button-outline text-xs w-full"
-            >
-              {u.is_active ? "Deactivate" : "Activate"} user
-            </button>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                onClick={() => toggleActive(u.id, !u.is_active)}
+                disabled={busy.has(u.id) || !!u.deleted_at || (u.id === currentUser?.id && u.is_active)}
+                className="button button-outline text-xs w-full"
+              >
+                {u.deleted_at ? "Account deleted" : `${u.is_active ? "Deactivate" : "Activate"} user`}
+              </button>
+              <button
+                onClick={() => deleteAccount(u.id)}
+                disabled={busy.has(u.id) || !!u.deleted_at || u.id === currentUser?.id}
+                className="w-full rounded border border-red-500/25 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {busy.has(u.id) ? "Working…" : u.deleted_at ? "Deleted" : "Delete account"}
+              </button>
+            </div>
           </div>
         ))}
       </div>

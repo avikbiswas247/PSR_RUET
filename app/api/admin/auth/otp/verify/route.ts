@@ -1,4 +1,5 @@
 import { AdminAuthService } from "@/lib/services";
+import { findUserById } from "@/lib/repositories/auth.repository";
 import { handleApiError, jsonOk, readJson } from "@/lib/api/http";
 
 type Body = { userId?: string; purpose?: "email_verification" | "password_reset" | "login"; code?: string };
@@ -13,10 +14,13 @@ export async function POST(request: Request) {
       return jsonOk({ message: "Invalid purpose." }, 422);
     }
 
-    // For email_verification after registration: no auth required (user just registered)
-    // For login verification: no auth required (user just logged in with password)
-    // For password_reset: no auth required (user is resetting password)
-    // All OTP verification is publicly accessible by userId + code
+    // Admin challenges are public until a session exists, but the target must be
+    // an active administrator before any OTP is consumed.
+
+    const user = await findUserById(body.userId);
+    if (!user || !user.is_active || !user.roles.includes("ADMIN")) {
+      return jsonOk({ message: "This verification request is not valid." }, 400);
+    }
 
     const result = await AdminAuthService.verifyOtp({
       userId: body.userId,

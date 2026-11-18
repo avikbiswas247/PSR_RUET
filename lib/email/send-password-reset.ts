@@ -1,6 +1,6 @@
 "use server";
 
-import nodemailer from "nodemailer";
+import { createMailTransporter } from "@/lib/email/mailer";
 
 export interface SendPasswordResetEmailInput {
   to: string;
@@ -8,29 +8,8 @@ export interface SendPasswordResetEmailInput {
   expiresInMinutes: number;
 }
 
-function createTransporter() {
-  const host = process.env.MAIL_HOST;
-  const port = Number(process.env.MAIL_PORT || 587);
-  const secure = process.env.MAIL_SECURE === "true";
-  const user = process.env.MAIL_USER;
-  const pass = process.env.MAIL_APP_PASSWORD;
-
-  if (!host || !user || !pass) {
-    throw new Error("Mail provider is not configured (MAIL_HOST, MAIL_USER, MAIL_APP_PASSWORD).");
-  }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
-  });
-}
-
 export async function sendPasswordResetEmail(input: SendPasswordResetEmailInput) {
-  const transporter = createTransporter();
-
-  const from = process.env.MAIL_FROM || `PSR <${process.env.MAIL_USER}>`;
+  const { transporter, from } = createMailTransporter();
   const logoUrl = new URL("/psr-logo-dark.png", input.resetUrl).toString();
 
   const html = `

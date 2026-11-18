@@ -20,7 +20,7 @@ export async function findUserForLogin(email: string): Promise<LoginUser | null>
      FROM users u
      LEFT JOIN user_roles ur ON ur.user_id = u.id
      LEFT JOIN roles r ON r.id = ur.role_id
-     WHERE LOWER(u.email) = LOWER($1)
+     WHERE LOWER(u.email) = LOWER($1) AND u.deleted_at IS NULL
      GROUP BY u.id`,
     [email.trim()],
   );
@@ -45,7 +45,7 @@ export async function findUserById(
      FROM users u
      LEFT JOIN user_roles ur ON ur.user_id = u.id
      LEFT JOIN roles r ON r.id = ur.role_id
-     WHERE u.id = $1
+     WHERE u.id = $1 AND u.deleted_at IS NULL
      GROUP BY u.id
      LIMIT 1`,
     [userId],

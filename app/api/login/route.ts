@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { findUserForLogin } from "@/lib/repositories/auth.repository";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { AdminAuthService } from "@/lib/services";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +23,26 @@ export async function POST(request: NextRequest) {
         requiresAdminOtp: true,
         userId: user.id,
       }, { status: 200 });
+    }
+
+    if (!user.email_verified_at) {
+      let verificationEmailSent = false;
+      try {
+        await AdminAuthService.sendOtpEmail({ userId: user.id, purpose: "email_verification" });
+        verificationEmailSent = true;
+      } catch (error) {
+        const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+        verificationEmailSent = code === "OTP_RESEND_COOLDOWN";
+        if (!verificationEmailSent) {
+          console.error("[Login] Verification email send failed:", error instanceof Error ? error.message : error);
+        }
+      }
+      return NextResponse.json({
+        message: "Verify your email address before signing in.",
+        code: "EMAIL_NOT_VERIFIED",
+        userId: user.id,
+        verificationEmailSent,
+      }, { status: 403 });
     }
 
     const token = await createSession(user.id); await setSessionCookie(token);

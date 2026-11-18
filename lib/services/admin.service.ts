@@ -7,6 +7,8 @@ import * as PortfolioRepo from "@/lib/repositories/portfolio.repository";
 import * as PhotoRepo from "@/lib/repositories/photo.repository";
 import * as BookingRepo from "@/lib/repositories/booking.repository";
 import { query, transaction } from "@/lib/db";
+import { randomBytes, randomUUID } from "node:crypto";
+import { hashPassword } from "@/lib/auth/password";
 /** Call these only from server routes/actions after verifying the actor's ADMIN role. */
 export const hasAdminRole=(userId:string)=>RoleRepo.userHasRole(userId,"ADMIN");
 export async function recordAdminAction(i:{authenticatedAdminId:string;action:string;targetType?:string|null;targetId?:string|null;metadata?:Record<string,unknown>}) { if(!i.action.trim()) throw new Error("Audit action is required."); return AuditRepo.createAuditLog({admin_id:i.authenticatedAdminId,action:i.action.trim(),target_type:i.targetType??null,target_id:i.targetId??null,metadata:i.metadata??{}}); }
@@ -20,6 +22,7 @@ export type AdminUser = {
   is_active: boolean;
   roles: string[];
   email_verified_at: string | Date | null;
+  deleted_at: string | Date | null;
   created_at: string | Date;
 };
 
@@ -38,6 +41,7 @@ export async function listAdminUsers(limit = 50, offset = 0) {
       is_active: u.is_active,
       roles: roles.map((r) => r.name),
       email_verified_at: u.email_verified_at,
+      deleted_at: u.deleted_at,
       created_at: u.created_at,
     });
   }
@@ -58,6 +62,7 @@ export async function updateUserRole(input: {
   }
   const targetUser = await UserRepo.getUserById(input.userId);
   if (!targetUser) throw new Error("User not found.");
+  if (targetUser.deleted_at) throw new Error("Deleted accounts cannot be assigned roles.");
   const role = await RoleRepo.getRoleByName(input.roleName);
   if (!role) throw new Error(`Role "${input.roleName}" does not exist.`);
   if (input.action === "ASSIGN") {
@@ -86,8 +91,13 @@ export async function deactivateUser(input: {
   if (!input.isActive && await isFounderAdmin(input.userId)) {
     throw new Error("Transfer Founder Admin status before deactivating this account.");
   }
+  const targetUser = await UserRepo.getUserById(input.userId);
+  if (!targetUser || targetUser.deleted_at) throw new Error("Deleted or missing accounts cannot be activated.");
   const row = await UserRepo.updateUser(input.userId, { is_active: input.isActive });
   if (!row) throw new Error("User not found.");
+  if (!input.isActive) {
+    await query("UPDATE photographer_availability SET is_available = FALSE WHERE photographer_id = $1", [input.userId]);
+  }
   await recordAdminAction({
     authenticatedAdminId: input.authenticatedAdminId,
     action: input.isActive ? "user_activate" : "user_deactivate",
@@ -96,6 +106,88 @@ export async function deactivateUser(input: {
     metadata: { is_active: input.isActive },
   });
   return row;
+}
+
+/** Anonymizes a user and revokes all credentials while preserving historical references. */
+export async function deleteUserAccount(input: { authenticatedAdminId: string; userId: string }) {
+  if (input.userId === input.authenticatedAdminId) {
+    throw new Error("You cannot delete your own administrator account.");
+  }
+
+  const suffix = randomUUID();
+  const replacementEmail = `deleted+${suffix}@deleted.invalid`;
+  const replacementUsername = `deleted-${suffix}`;
+  const replacementPasswordHash = await hashPassword(randomBytes(32).toString("base64url"));
+
+  const deleted = await transaction(async (client) => {
+    const targetResult = await client.query(
+      "SELECT id, deleted_at, is_active FROM users WHERE id = $1 FOR UPDATE",
+      [input.userId],
+    );
+    const target = targetResult.rows[0];
+    if (!target || target.deleted_at) throw new Error("Account not found or already deleted.");
+    const roleResult = await client.query(
+      `SELECT COALESCE(array_agg(r.name), ARRAY[]::varchar[]) AS roles
+       FROM user_roles ur INNER JOIN roles r ON r.id = ur.role_id
+       WHERE ur.user_id = $1`,
+      [input.userId],
+    );
+    const targetRoles = roleResult.rows[0]?.roles as string[];
+
+    const founder = await client.query(
+      "SELECT user_id FROM admin_founders WHERE user_id = $1 AND is_active = TRUE FOR UPDATE",
+      [input.userId],
+    );
+    if (founder.rows.length) throw new Error("Transfer Founder Admin status before deleting this account.");
+
+    if (targetRoles.includes("ADMIN") && target.is_active) {
+      const admins = await client.query(
+        `SELECT COUNT(DISTINCT u.id)::int AS count
+         FROM users u
+         INNER JOIN user_roles ur ON ur.user_id = u.id
+         INNER JOIN roles r ON r.id = ur.role_id
+         WHERE r.name = 'ADMIN' AND u.is_active = TRUE AND u.deleted_at IS NULL`,
+      );
+      if ((admins.rows[0]?.count ?? 0) <= 1) {
+        throw new Error("The last active administrator cannot be deleted.");
+      }
+    }
+
+    const result = await client.query(
+      `UPDATE users
+       SET full_name = 'Deleted account', username = $2, email = $3,
+           password_hash = $4, avatar_url = NULL, phone = NULL,
+           is_active = FALSE, email_verified_at = NULL, deleted_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id, full_name, email, is_active, deleted_at`,
+      [input.userId, replacementUsername, replacementEmail, replacementPasswordHash],
+    );
+    if (!result.rows[0]) throw new Error("Account not found or already deleted.");
+
+    await client.query("UPDATE user_sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL", [input.userId]);
+    await client.query("UPDATE otp_codes SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL", [input.userId]);
+    await client.query("UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL", [input.userId]);
+    await client.query("UPDATE photographer_availability SET is_available = FALSE WHERE photographer_id = $1", [input.userId]);
+    await client.query(
+      `UPDATE photographer_profiles
+       SET is_available = FALSE, avatar_url = NULL, title = NULL, bio = NULL,
+           location = NULL, instagram_url = NULL, website_url = NULL
+       WHERE user_id = $1`,
+      [input.userId],
+    );
+    await client.query("UPDATE portfolios SET is_public = FALSE WHERE photographer_id = $1", [input.userId]);
+    await client.query("UPDATE photos SET visibility = 'PRIVATE' WHERE photographer_id = $1 AND visibility = 'PUBLIC'", [input.userId]);
+    return { ...result.rows[0], roles: targetRoles };
+  });
+
+  await recordAdminAction({
+    authenticatedAdminId: input.authenticatedAdminId,
+    action: "user_account_delete",
+    targetType: "user",
+    targetId: input.userId,
+    metadata: { roles: deleted.roles, anonymized: true },
+  });
+  return { id: deleted.id, full_name: deleted.full_name, email: deleted.email, is_active: deleted.is_active, deleted_at: deleted.deleted_at };
 }
 
 export type AdminPhotographer = {
@@ -115,7 +207,7 @@ export async function listAdminPhotographers(limit = 50, offset = 0) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {
     throw new Error("Invalid pagination.");
   }
-  const profiles = await ProfileRepo.listPhotographerProfiles(limit, offset);
+  const profiles = await ProfileRepo.listPhotographerProfiles(limit, offset, { includeInactive: true });
   const result: AdminPhotographer[] = [];
   for (const p of profiles) {
     let user: { full_name: string | null; email: string } | null = null;
@@ -383,8 +475,8 @@ export type DashboardStats = {
 export async function getDashboardStats(): Promise<DashboardStats> {
   const [totalUsers, activeUsers, pendingApps, photos, events, exhibitions, bookings, awards] =
     await Promise.all([
-      query("SELECT COUNT(*)::text AS c FROM users"),
-      query("SELECT COUNT(*)::text AS c FROM users WHERE is_active = TRUE"),
+      query("SELECT COUNT(*)::text AS c FROM users WHERE deleted_at IS NULL"),
+      query("SELECT COUNT(*)::text AS c FROM users WHERE is_active = TRUE AND deleted_at IS NULL"),
       query("SELECT COUNT(*)::text AS c FROM membership_applications WHERE status = 'PENDING'"),
       query("SELECT COUNT(*)::text AS c FROM photos WHERE visibility <> 'PUBLIC'"),
       query("SELECT COUNT(*)::text AS c FROM events WHERE status = 'PUBLISHED'"),
@@ -395,12 +487,20 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   // Active members: users with MEMBER role
   const membersResult = await query(
-    `SELECT COUNT(DISTINCT ur.user_id)::text AS c FROM user_roles ur INNER JOIN roles r ON r.id = ur.role_id WHERE r.name = 'MEMBER'`
+    `SELECT COUNT(DISTINCT ur.user_id)::text AS c
+     FROM user_roles ur
+     INNER JOIN roles r ON r.id = ur.role_id
+     INNER JOIN users u ON u.id = ur.user_id
+     WHERE r.name = 'MEMBER' AND u.is_active = TRUE AND u.deleted_at IS NULL`
   );
 
   // Registered photographers: users with PHOTOGRAPHER role
   const photographersResult = await query(
-    `SELECT COUNT(DISTINCT ur.user_id)::text AS c FROM user_roles ur INNER JOIN roles r ON r.id = ur.role_id WHERE r.name = 'PHOTOGRAPHER'`
+    `SELECT COUNT(DISTINCT ur.user_id)::text AS c
+     FROM user_roles ur
+     INNER JOIN roles r ON r.id = ur.role_id
+     INNER JOIN users u ON u.id = ur.user_id
+     WHERE r.name = 'PHOTOGRAPHER' AND u.is_active = TRUE AND u.deleted_at IS NULL`
   );
 
   // Upcoming events: published events with start_at in the future

@@ -28,8 +28,10 @@ export function getPhotographerProfileByUserId(userId: string) {
   return one<PhotographerProfile>(`SELECT * FROM ${TABLE} WHERE user_id = $1 LIMIT 1`, [userId]);
 }
 
-export function listPhotographerProfiles(limit = 50, offset = 0, filters?: { search?: string | null; genre?: string | null; device?: string | null; location?: string | null }) {
-  const conditions: string[] = [];
+export function listPhotographerProfiles(limit = 50, offset = 0, filters?: { search?: string | null; genre?: string | null; device?: string | null; location?: string | null; includeInactive?: boolean }) {
+  const conditions: string[] = filters?.includeInactive
+    ? []
+    : ["(pp.user_id IS NULL OR (u.id IS NOT NULL AND u.is_active = TRUE AND u.deleted_at IS NULL AND u.email_verified_at IS NOT NULL))"];
   const params: unknown[] = [];
   let paramIndex = 1;
 

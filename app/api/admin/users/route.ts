@@ -44,3 +44,16 @@ export async function PATCH(request: Request) {
     }));
   } catch (error) { return handleApiError(error); }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const auth = await requireUser(); if (isResponse(auth)) return auth;
+    const denied = requireRole(auth, "ADMIN"); if (denied) return denied;
+    const body = await readJson<Body>(request);
+    if (!body.userId) return jsonOk({ message: "userId is required." }, 422);
+    return jsonOk(await AdminService.deleteUserAccount({
+      authenticatedAdminId: auth.id,
+      userId: body.userId,
+    }));
+  } catch (error) { return handleApiError(error); }
+}

@@ -43,10 +43,12 @@ export async function listPublicPhotographers(input: { limit?: number; offset?: 
     let user: { full_name: string | null; email: string; avatar_url: string | null } | null = null;
     if (profile.user_id) {
       const u = await UserRepo.getUserById(profile.user_id);
-      if (u) {
+      if (u && u.is_active && !u.deleted_at) {
         const { password_hash: _secret, ...safe } = u;
         void _secret;
         user = { full_name: safe.full_name, email: safe.email, avatar_url: safe.avatar_url ?? null };
+      } else {
+        continue;
       }
     }
     const roles = profile.user_id ? await RoleRepo.getUserRoles(profile.user_id) : [];
@@ -79,6 +81,7 @@ export async function getPublicPhotographer(id: string) {
   let user: { full_name: string | null; avatar_url: string | null } | null = null;
   if (profile.user_id) {
     const u = await UserRepo.getUserById(profile.user_id);
+    if (!u || !u.is_active || u.deleted_at || !u.email_verified_at) return null;
     if (u) {
       const { password_hash: _secret, ...safe } = u;
       void _secret;

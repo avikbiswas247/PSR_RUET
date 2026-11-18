@@ -5,7 +5,7 @@ import * as UserRepo from "@/lib/repositories/user.repository";
 import * as AuthRepo from "@/lib/repositories/auth.repository";
 import * as UserSessionRepo from "@/lib/repositories/user-session.repository";
 import * as AuthService from "@/lib/services/auth.service";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, hashSessionToken, setSessionCookie, clearSessionCookie, getSessionToken } from "@/lib/auth/session";
 import { transaction, query } from "@/lib/db";
@@ -24,6 +24,7 @@ const OTP_MAX_ATTEMPTS = 5;
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const OTP_SEND_RATE_LIMIT_PER_HOUR = 5;
 const INVITATION_TTL_HOURS = 48;
+const OTP_APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
 /* ============================================
    BOOTSTRAP - First admin creation
@@ -66,7 +67,7 @@ export async function bootstrapAdmin(input: {
       `SELECT u.id FROM users u
        INNER JOIN user_roles ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id
-       WHERE r.name = 'ADMIN'
+       WHERE r.name = 'ADMIN' AND u.deleted_at IS NULL
        FOR UPDATE`,
     );
     if (existing.rows.length >= ADMIN_MAX) {
@@ -185,7 +186,7 @@ async function countAdminSlotsReserved(): Promise<number> {
       (SELECT COUNT(*) FROM users u
        INNER JOIN user_roles ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id
-       WHERE r.name = 'ADMIN')
+       WHERE r.name = 'ADMIN' AND u.deleted_at IS NULL)
       +
       (SELECT COUNT(*) FROM admin_invitations
        WHERE used_at IS NULL AND expires_at > NOW())
@@ -259,7 +260,7 @@ export async function completeAdminRegistration(input: {
       `SELECT u.id FROM users u
        INNER JOIN user_roles ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id
-       WHERE r.name = 'ADMIN'
+       WHERE r.name = 'ADMIN' AND u.deleted_at IS NULL
        FOR UPDATE`,
     );
     if (existing.rows.length >= ADMIN_MAX) {
@@ -377,9 +378,6 @@ export async function generateOtp(input: {
     );
   }
 
-  // Invalidate older unused OTPs for this purpose.
-  await OtpCodeRepo.invalidateOldOtps(input.userId, input.purpose);
-
   // Check resend cooldown: if a code was created within the last 60s, block.
   const existing = await OtpCodeRepo.findValidOtpCode(input.userId, input.purpose);
   if (existing) {
@@ -397,7 +395,8 @@ export async function generateOtp(input: {
     await OtpCodeRepo.markOtpUsed(existing.id);
   }
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  await OtpCodeRepo.invalidateOldOtps(input.userId, input.purpose);
+  const code = randomInt(100000, 1000000).toString();
   const codeHash = createHash("sha256").update(code).digest("hex");
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000).toISOString();
 
@@ -410,6 +409,39 @@ export async function generateOtp(input: {
   });
 
   return { code, expires_at: expiresAt };
+}
+
+/** Generate and deliver an OTP without exposing the code to API callers. */
+export async function sendOtpEmail(input: {
+  userId: string;
+  purpose: "email_verification" | "password_reset" | "login";
+}) {
+  const user = await AuthRepo.findUserById(input.userId);
+  if (!user || !user.is_active) throw new AdminAuthError("User not found or inactive.", "USER_NOT_FOUND");
+  const otp = await generateOtp(input);
+  const isAdmin = user.roles.includes("ADMIN");
+  const verificationPath = input.purpose === "login"
+    ? `/admin/verify-login?userId=${encodeURIComponent(user.id)}`
+    : input.purpose === "password_reset"
+      ? `/admin/auth/otp?userId=${encodeURIComponent(user.id)}&purpose=password_reset`
+      : isAdmin
+        ? `/admin/verify-email?userId=${encodeURIComponent(user.id)}&email=${encodeURIComponent(user.email)}`
+        : `/verify-email?userId=${encodeURIComponent(user.id)}&email=${encodeURIComponent(user.email)}`;
+  try {
+    await sendAdminOtpEmail({
+      to: user.email,
+      userId: user.id,
+      code: otp.code,
+      purpose: input.purpose,
+      expiresInMinutes: OTP_TTL_MINUTES,
+      verificationUrl: `${OTP_APP_BASE_URL}${verificationPath}`,
+    });
+  } catch (error) {
+    await OtpCodeRepo.invalidateOldOtps(input.userId, input.purpose);
+    console.error("[AdminAuth] OTP mail send failed:", error instanceof Error ? error.message : error);
+    throw new AdminAuthError("Unable to send the verification code. Please try again later.", "OTP_EMAIL_FAILED");
+  }
+  return { expires_at: otp.expires_at };
 }
 
 /**
@@ -459,7 +491,7 @@ export async function activateAdminAccount(userId: string) {
       `SELECT u.id FROM users u
        INNER JOIN user_roles ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id
-       WHERE r.name = 'ADMIN'
+       WHERE r.name = 'ADMIN' AND u.deleted_at IS NULL
        FOR UPDATE`,
     );
     if (existing.rows.length > ADMIN_MAX) {
@@ -532,28 +564,28 @@ export async function adminLogin(input: {
     throw new AdminAuthError("This account is not an administrator.", "FORBIDDEN");
   }
 
-  // Generate and send login OTP (two-factor). Session is created only after OTP verification.
-  const otp = await generateOtp({ userId: user.id, purpose: "login" });
-  const userRecord = await UserRepo.getUserById(user.id);
-  if (userRecord) {
-    try {
-      await sendAdminOtpEmail({
-        to: userRecord.email,
-        userId: user.id,
-        code: otp.code,
-        purpose: "login",
-        expiresInMinutes: 10,
-      });
-    } catch (mailErr) {
-      console.error("[AdminLogin] OTP mail send failed:", mailErr instanceof Error ? mailErr.message : mailErr);
-    }
+  if (!user.email_verified_at) {
+    const otp = await sendOtpEmail({ userId: user.id, purpose: "email_verification" });
+    return {
+      id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      requiresEmailVerification: true,
+      requiresOtp: false,
+      otpExpiresAt: otp.expires_at,
+    };
   }
+
+  // The session is created only after the administrator's login OTP is verified.
+  const otp = await sendOtpEmail({ userId: user.id, purpose: "login" });
 
   return {
     id: user.id,
     full_name: user.full_name,
     email: user.email,
     requiresOtp: true,
+    requiresEmailVerification: false,
+    otpExpiresAt: otp.expires_at,
   };
 }
 
@@ -627,12 +659,12 @@ export async function adminForgotPassword(input: { email: string }) {
   if (user && user.is_active) {
     const isAdmin = await RoleRepo.userHasRole(user.id, "ADMIN");
     if (isAdmin) {
-      const otp = await generateOtp({ userId: user.id, purpose: "password_reset" });
+      const otp = await sendOtpEmail({ userId: user.id, purpose: "password_reset" });
       return { userId: user.id, otpExpiresAt: otp.expires_at };
     }
   }
   // Generic response: don't reveal whether email exists.
-  return { userId: null };
+  return { userId: null, otpExpiresAt: null };
 }
 
 /**
@@ -645,6 +677,11 @@ export async function adminResetPassword(input: {
 }) {
   if (input.newPassword.length < 8 || input.newPassword.length > 128) {
     throw new AdminAuthError("Password must contain between 8 and 128 characters.", "INVALID_PASSWORD");
+  }
+
+  const user = await AuthRepo.findUserById(input.userId);
+  if (!user || !user.is_active || !user.roles.includes("ADMIN")) {
+    throw new AdminAuthError("This account cannot use administrator password recovery.", "FORBIDDEN");
   }
 
   await verifyOtp({

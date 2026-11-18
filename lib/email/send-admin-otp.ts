@@ -1,6 +1,6 @@
 "use server";
 
-import nodemailer from "nodemailer";
+import { createMailTransporter } from "@/lib/email/mailer";
 
 export interface SendAdminOtpInput {
   to: string;
@@ -8,6 +8,7 @@ export interface SendAdminOtpInput {
   code: string;
   purpose: "email_verification" | "password_reset" | "login";
   expiresInMinutes: number;
+  verificationUrl?: string;
 }
 
 export interface SendAdminInvitationInput {
@@ -17,26 +18,6 @@ export interface SendAdminInvitationInput {
   expiresInHours: number;
 }
 
-function createTransporter() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const secure = process.env.SMTP_SECURE === "true";
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASSWORD;
-
-  if (!host || !user || !pass) {
-    throw new Error("Mail provider is not configured (SMTP_HOST, SMTP_USER, SMTP_PASSWORD).");
-  }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
-  });
-}
-
-const FROM = process.env.SMTP_FROM || `PSR Admin <${process.env.SMTP_USER}>`;
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
 function brandLogo() {
@@ -66,7 +47,7 @@ function footer() {
 }
 
 export async function sendAdminOtpEmail(input: SendAdminOtpInput) {
-  const transporter = createTransporter();
+  const { transporter, from } = createMailTransporter();
 
   const purposeLabel = input.purpose === "email_verification" ? "Verify your email" : input.purpose === "login" ? "Verify your login" : "Reset your password";
 
@@ -86,7 +67,7 @@ export async function sendAdminOtpEmail(input: SendAdminOtpInput) {
           <p style="margin:0 0 24px;color:#a29d97;">
             Your one-time code is <strong style="letter-spacing:0.25em;font-family:monospace;">${input.code}</strong>.
           </p>
-          ${button(input.purpose === "login" ? `${APP_BASE_URL}/admin/verify-login?userId=${encodeURIComponent(input.userId)}` : `${APP_BASE_URL}/admin/verify-email?userId=${encodeURIComponent(input.userId)}&purpose=${input.purpose}`, "Verify Code")}
+          ${input.verificationUrl ? button(input.verificationUrl, "Verify Code") : ""}
           <p style="margin:0 0 16px;color:#a29d97;font-size:14px;">
             This code expires in <strong>${input.expiresInMinutes} minutes</strong> and can be used only once.
           </p>
@@ -104,13 +85,14 @@ PSR — ${purposeLabel}
 Your one-time code is: ${input.code}
 
 This code expires in ${input.expiresInMinutes} minutes and can be used only once.
+${input.verificationUrl ? `Continue here: ${input.verificationUrl}` : ""}
 
 PSR
 Rajshahi · Bangladesh
   `.trim();
 
   const info = await transporter.sendMail({
-    from: FROM,
+    from,
     to: input.to,
     subject: `${purposeLabel} — PSR`,
     text,
@@ -121,7 +103,7 @@ Rajshahi · Bangladesh
 }
 
 export async function sendAdminInvitationEmail(input: SendAdminInvitationInput) {
-  const transporter = createTransporter();
+  const { transporter, from } = createMailTransporter();
 
   const html = `
 <!DOCTYPE html>
@@ -165,7 +147,7 @@ Rajshahi · Bangladesh
   `.trim();
 
   const info = await transporter.sendMail({
-    from: FROM,
+    from,
     to: input.to,
     subject: "Administrator Invitation — PSR",
     text,

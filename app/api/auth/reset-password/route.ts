@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { findPasswordReset, consumePasswordReset, changePassword } from "@/lib/services/auth.service";
 import { hashPassword } from "@/lib/auth/password";
+import { findUserById } from "@/lib/repositories/auth.repository";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +14,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "A reset token is required.", code: "MISSING_TOKEN" }, { status: 400 });
     }
 
-    if (newPassword.length < 8) {
-      return NextResponse.json({ message: "Password must be at least 8 characters.", code: "WEAK_PASSWORD" }, { status: 422 });
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      return NextResponse.json({ message: "Password must contain between 8 and 128 characters.", code: "WEAK_PASSWORD" }, { status: 422 });
     }
 
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const reset = await findPasswordReset(tokenHash);
 
     if (!reset) {
+      return NextResponse.json({ message: "Invalid or expired reset token.", code: "INVALID_TOKEN" }, { status: 400 });
+    }
+
+    const user = await findUserById(reset.user_id);
+    if (!user || user.roles.includes("ADMIN")) {
       return NextResponse.json({ message: "Invalid or expired reset token.", code: "INVALID_TOKEN" }, { status: 400 });
     }
 

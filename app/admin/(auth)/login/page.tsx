@@ -30,8 +30,13 @@ export default function AdminLoginPage() {
       if (!json.data || !json.data.userId) {
         throw new Error("Login response missing verification identifier.");
       }
-      setNotice("Verification code sent. Please check your email.");
-      router.push(`/admin/verify-login?userId=${encodeURIComponent(json.data.userId)}`);
+      if (json.data.requiresEmailVerification) {
+        setNotice("Please verify your email to activate administrator access.");
+        router.push(`/admin/verify-email?userId=${encodeURIComponent(json.data.userId)}&email=${encodeURIComponent(email)}`);
+      } else {
+        setNotice("Verification code sent. Please check your email.");
+        router.push(`/admin/verify-login?userId=${encodeURIComponent(json.data.userId)}`);
+      }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Login failed. Please try again.");
       setBusy(false);
