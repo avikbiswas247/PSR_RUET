@@ -7,8 +7,6 @@ import * as PortfolioRepo from "@/lib/repositories/portfolio.repository";
 import * as PhotoRepo from "@/lib/repositories/photo.repository";
 import * as BookingRepo from "@/lib/repositories/booking.repository";
 import { query, transaction } from "@/lib/db";
-import { randomBytes, randomUUID } from "node:crypto";
-import { hashPassword } from "@/lib/auth/password";
 /** Call these only from server routes/actions after verifying the actor's ADMIN role. */
 export const hasAdminRole=(userId:string)=>RoleRepo.userHasRole(userId,"ADMIN");
 export async function recordAdminAction(i:{authenticatedAdminId:string;action:string;targetType?:string|null;targetId?:string|null;metadata?:Record<string,unknown>}) { if(!i.action.trim()) throw new Error("Audit action is required."); return AuditRepo.createAuditLog({admin_id:i.authenticatedAdminId,action:i.action.trim(),target_type:i.targetType??null,target_id:i.targetId??null,metadata:i.metadata??{}}); }
@@ -30,7 +28,7 @@ export async function listAdminUsers(limit = 50, offset = 0) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {
     throw new Error("Invalid pagination.");
   }
-  const users = await UserRepo.listUsers(limit, offset);
+  const users = await UserRepo.listUsers(limit, offset, false);
   const result: AdminUser[] = [];
   for (const u of users) {
     const roles = await RoleRepo.getUserRoles(u.id);
@@ -108,20 +106,15 @@ export async function deactivateUser(input: {
   return row;
 }
 
-/** Anonymizes a user and revokes all credentials while preserving historical references. */
+/** Permanently removes a user's account and account-owned records. */
 export async function deleteUserAccount(input: { authenticatedAdminId: string; userId: string }) {
   if (input.userId === input.authenticatedAdminId) {
     throw new Error("You cannot delete your own administrator account.");
   }
 
-  const suffix = randomUUID();
-  const replacementEmail = `deleted+${suffix}@deleted.invalid`;
-  const replacementUsername = `deleted-${suffix}`;
-  const replacementPasswordHash = await hashPassword(randomBytes(32).toString("base64url"));
-
-  const deleted = await transaction(async (client) => {
+  await transaction(async (client) => {
     const targetResult = await client.query(
-      "SELECT id, deleted_at, is_active FROM users WHERE id = $1 FOR UPDATE",
+      "SELECT id, email, deleted_at, is_active FROM users WHERE id = $1 FOR UPDATE",
       [input.userId],
     );
     const target = targetResult.rows[0];
@@ -153,41 +146,47 @@ export async function deleteUserAccount(input: { authenticatedAdminId: string; u
       }
     }
 
-    const result = await client.query(
-      `UPDATE users
-       SET full_name = 'Deleted account', username = $2, email = $3,
-           password_hash = $4, avatar_url = NULL, phone = NULL,
-           is_active = FALSE, email_verified_at = NULL, deleted_at = NOW()
-       WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id, full_name, email, is_active, deleted_at`,
-      [input.userId, replacementUsername, replacementEmail, replacementPasswordHash],
-    );
-    if (!result.rows[0]) throw new Error("Account not found or already deleted.");
+    // Preserve club content authored by this account while moving ownership to
+    // the administrator carrying out the deletion.
+    await client.query("UPDATE events SET created_by = $2 WHERE created_by = $1", [input.userId, input.authenticatedAdminId]);
+    await client.query("UPDATE exhibitions SET created_by = $2 WHERE created_by = $1", [input.userId, input.authenticatedAdminId]);
 
-    await client.query("UPDATE user_sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL", [input.userId]);
-    await client.query("UPDATE otp_codes SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL", [input.userId]);
-    await client.query("UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL", [input.userId]);
-    await client.query("UPDATE photographer_availability SET is_available = FALSE WHERE photographer_id = $1", [input.userId]);
+    // Remove references that otherwise restrict deleting the user row. Records
+    // that belong to the account are removed; moderation records authored by
+    // this account and historical founder references are also cleared.
+    await client.query("UPDATE admin_founders SET designated_by = NULL WHERE designated_by = $1", [input.userId]);
+    await client.query("UPDATE admin_founders SET transferred_to = NULL WHERE transferred_to = $1", [input.userId]);
     await client.query(
-      `UPDATE photographer_profiles
-       SET is_available = FALSE, avatar_url = NULL, title = NULL, bio = NULL,
-           location = NULL, instagram_url = NULL, website_url = NULL
-       WHERE user_id = $1`,
+      "DELETE FROM membership_applications WHERE user_id = $1 OR LOWER(email) = LOWER($2)",
+      [input.userId, target.email],
+    );
+    await client.query("DELETE FROM admin_invitations WHERE LOWER(email) = LOWER($1)", [target.email]);
+    await client.query("DELETE FROM photo_reviews WHERE admin_user_id = $1", [input.userId]);
+    await client.query("DELETE FROM photo_appreciations WHERE admin_user_id = $1", [input.userId]);
+    await client.query(
+      `DELETE FROM booking_messages
+       WHERE sender_user_id = $1
+          OR booking_id IN (SELECT id FROM bookings WHERE client_id = $1 OR photographer_id = $1)`,
       [input.userId],
     );
-    await client.query("UPDATE portfolios SET is_public = FALSE WHERE photographer_id = $1", [input.userId]);
-    await client.query("UPDATE photos SET visibility = 'PRIVATE' WHERE photographer_id = $1 AND visibility = 'PUBLIC'", [input.userId]);
-    return { ...result.rows[0], roles: targetRoles };
+    await client.query("DELETE FROM bookings WHERE client_id = $1 OR photographer_id = $1", [input.userId]);
+    await client.query(
+      `DELETE FROM exhibition_items
+       WHERE photo_id IN (SELECT id FROM photos WHERE photographer_id = $1)`,
+      [input.userId],
+    );
+
+    await client.query(
+      `INSERT INTO audit_logs (admin_id, action, target_type, target_id, metadata)
+       VALUES ($1, 'user_account_delete', 'user', $2, $3::jsonb)`,
+      [input.authenticatedAdminId, input.userId, JSON.stringify({ roles: targetRoles, permanentlyDeleted: true })],
+    );
+
+    const result = await client.query("DELETE FROM users WHERE id = $1 AND deleted_at IS NULL RETURNING id", [input.userId]);
+    if (!result.rows[0]) throw new Error("Account not found or already deleted.");
   });
 
-  await recordAdminAction({
-    authenticatedAdminId: input.authenticatedAdminId,
-    action: "user_account_delete",
-    targetType: "user",
-    targetId: input.userId,
-    metadata: { roles: deleted.roles, anonymized: true },
-  });
-  return { id: deleted.id, full_name: deleted.full_name, email: deleted.email, is_active: deleted.is_active, deleted_at: deleted.deleted_at };
+  return { id: input.userId, deleted: true };
 }
 
 export type AdminPhotographer = {

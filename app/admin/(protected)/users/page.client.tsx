@@ -90,7 +90,7 @@ export default function AdminUsersPage() {
   );
 
   const deleteAccount = useCallback(async (id: string) => {
-    if (!window.confirm("Delete this account? Sign-in access will be revoked, personal details anonymized, and public profile content hidden. This action cannot be undone.")) return;
+    if (!window.confirm("Permanently delete this account and its profile, photos, portfolios, bookings, and account records? Events and exhibitions created by this account will be reassigned to you. This action cannot be undone.")) return;
     setBusy((prev) => new Set([...prev, id]));
     try {
       const res = await fetch("/api/admin/users", {
@@ -100,9 +100,8 @@ export default function AdminUsersPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || json.data?.message || "Unable to delete account.");
-      const deleted = json.data as Pick<AdminUser, "id" | "full_name" | "email" | "is_active" | "deleted_at">;
-      setDisplayUsers((list) => list.map((user) => user.id === id ? { ...user, ...deleted } : user));
-      setNotice("Account deleted and personal details anonymized.");
+      setDisplayUsers((list) => list.filter((user) => user.id !== id));
+      setNotice("Account permanently deleted.");
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Please try again.");
     } finally {

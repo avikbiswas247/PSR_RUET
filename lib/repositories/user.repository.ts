@@ -22,8 +22,9 @@ export function getUserById(id: string) {
   return byId<User>(TABLE, id);
 }
 
-export function listUsers(limit = 50, offset = 0) {
-  return many<User>(`SELECT * FROM ${TABLE} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]);
+export function listUsers(limit = 50, offset = 0, includeDeleted = true) {
+  const where = includeDeleted ? "" : "WHERE deleted_at IS NULL";
+  return many<User>(`SELECT * FROM ${TABLE} ${where} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]);
 }
 
 export function createUser(input: Pick<User, "full_name" | "email" | "password_hash" | "avatar_url" | "phone" | "is_active" | "email_verified_at">) {
