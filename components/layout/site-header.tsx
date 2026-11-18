@@ -12,7 +12,7 @@ import { Menu, X } from "lucide-react";
 
 function isActivePath(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
-  if (href === "/photographers") return pathname.startsWith("/photographers") || pathname.startsWith("/portfolios");
+  if (href === "/portfolios") return pathname.startsWith("/portfolios") || pathname.startsWith("/photographers");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -37,7 +37,7 @@ export function SiteHeader({
         </Link>
         <nav className="desktop-nav" aria-label="Main navigation">
           <Link href="/" className={`nav-link ${isActivePath(pathname, "/") ? "active" : ""}`} aria-current={isActivePath(pathname, "/") ? "page" : undefined}>Home</Link>
-          <Link href="/photographers" className={`nav-link ${isActivePath(pathname, "/photographers") ? "active" : ""}`} aria-current={isActivePath(pathname, "/photographers") ? "page" : undefined}>Portfolios</Link>
+          <Link href="/portfolios" className={`nav-link ${isActivePath(pathname, "/portfolios") ? "active" : ""}`} aria-current={isActivePath(pathname, "/portfolios") ? "page" : undefined}>Portfolios</Link>
           <Link href="/events" className={`nav-link ${isActivePath(pathname, "/events") ? "active" : ""}`} aria-current={isActivePath(pathname, "/events") ? "page" : undefined}>Events</Link>
           <Link href="/exhibitions" className={`nav-link ${isActivePath(pathname, "/exhibitions") ? "active" : ""}`} aria-current={isActivePath(pathname, "/exhibitions") ? "page" : undefined}>Exhibitions</Link>
           <Link href="/membership" className={`nav-link ${isActivePath(pathname, "/membership") ? "active" : ""}`} aria-current={isActivePath(pathname, "/membership") ? "page" : undefined}>Join PSR</Link>
@@ -57,7 +57,7 @@ export function SiteHeader({
       </Link>
       <nav className="desktop-nav" aria-label="Main navigation">
         <Link href="/" className={`nav-link ${isActivePath(pathname, "/") ? "active" : ""}`} aria-current={isActivePath(pathname, "/") ? "page" : undefined}>Home</Link>
-        <Link href="/photographers" className={`nav-link ${isActivePath(pathname, "/photographers") ? "active" : ""}`} aria-current={isActivePath(pathname, "/photographers") ? "page" : undefined}>Portfolios</Link>
+        <Link href="/portfolios" className={`nav-link ${isActivePath(pathname, "/portfolios") ? "active" : ""}`} aria-current={isActivePath(pathname, "/portfolios") ? "page" : undefined}>Portfolios</Link>
         <Link href="/events" className={`nav-link ${isActivePath(pathname, "/events") ? "active" : ""}`} aria-current={isActivePath(pathname, "/events") ? "page" : undefined}>Events</Link>
         <Link href="/exhibitions" className={`nav-link ${isActivePath(pathname, "/exhibitions") ? "active" : ""}`} aria-current={isActivePath(pathname, "/exhibitions") ? "page" : undefined}>Exhibitions</Link>
         <Link href="/membership" className={`nav-link ${isActivePath(pathname, "/membership") ? "active" : ""}`} aria-current={isActivePath(pathname, "/membership") ? "page" : undefined}>Join PSR</Link>

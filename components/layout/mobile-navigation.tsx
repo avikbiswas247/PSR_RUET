@@ -7,7 +7,7 @@ import { getRoleHomeLabel, getRoleHomePath } from "@/lib/auth/role-home";
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/photographers", label: "Portfolios" },
+  { href: "/portfolios", label: "Portfolios" },
   { href: "/events", label: "Events" },
   { href: "/exhibitions", label: "Exhibitions" },
   { href: "/membership", label: "Join PSR" },
@@ -26,7 +26,7 @@ export function MobileNavigation({
 }: MobileNavigationProps) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const active = (href: string) => href === "/" ? pathname === "/" : (href === "/photographers" ? pathname.startsWith("/photographers") || pathname.startsWith("/portfolios") : pathname === href || pathname.startsWith(`${href}/`));
+  const active = (href: string) => href === "/" ? pathname === "/" : (href === "/portfolios" ? pathname.startsWith("/portfolios") || pathname.startsWith("/photographers") : pathname === href || pathname.startsWith(`${href}/`));
   return (
     <div
       id="mobile-links"

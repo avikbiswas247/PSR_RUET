@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/photographers", label: "Portfolios" },
+  { href: "/portfolios", label: "Portfolios" },
   { href: "/events", label: "Events" },
   { href: "/exhibitions", label: "Exhibitions" },
   { href: "/membership", label: "Join PSR" },
@@ -20,7 +20,7 @@ export function DesktopNavigation({
 }: DesktopNavigationProps) {
   const pathname = usePathname();
   const current = activeHref ?? pathname;
-  const isActive = (href: string) => href === "/" ? current === "/" : (href === "/photographers" ? current.startsWith("/photographers") || current.startsWith("/portfolios") : current === href || current.startsWith(`${href}/`));
+  const isActive = (href: string) => href === "/" ? current === "/" : (href === "/portfolios" ? current.startsWith("/portfolios") || current.startsWith("/photographers") : current === href || current.startsWith(`${href}/`));
   return (
     <nav
       className={`desktop-nav ${className || ""}`}
