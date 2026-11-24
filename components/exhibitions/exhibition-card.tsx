@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CalendarDays, MapPin } from "lucide-react";
 
 interface ExhibitionCardProps {
   id: string;
@@ -53,9 +54,14 @@ export function ExhibitionCard({
           {title || "Untitled Exhibition"}
         </Link>
         <div className="mb-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-          <span aria-hidden="true">\u270D\uFE0F</span>
+          <CalendarDays size={13} className="shrink-0 text-orange" aria-hidden="true" />
           <span className="shrink-0">{start}</span>
-          {venue && <span className="min-w-0 break-words [overflow-wrap:anywhere]">{venue}</span>}
+          {venue && (
+            <>
+              <MapPin size={13} className="shrink-0 text-orange" aria-hidden="true" />
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">{venue}</span>
+            </>
+          )}
         </div>
         {description && (
           <p className="mb-4 break-words text-sm text-muted line-clamp-2">{description}</p>

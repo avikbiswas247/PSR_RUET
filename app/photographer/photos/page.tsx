@@ -201,10 +201,12 @@ export default function PhotographerPhotosPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {photos.length === 0 ? (
-          <div className="col-span-full p-16 flex flex-col items-center justify-center rounded-xl border border-dashed border-line-border bg-surface-2 text-muted">
-            <span className="text-2xl mb-3">📷</span>
-            <p className="text-sm">No photos yet</p>
-            <p className="text-xs text-gray-500 mt-1">Upload your first photo to build your portfolio.</p>
+          <div className="col-span-full">
+            <EmptyState
+              compact
+              title="No photos yet"
+              description="Upload your first photo to build your portfolio."
+            />
           </div>
         ) : (
           photos.map((p) => (

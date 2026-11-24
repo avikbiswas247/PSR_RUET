@@ -62,7 +62,6 @@ export default function AdminAuditLogsPage() {
         loading={loading}
         emptyTitle="No audit logs"
         emptyDescription="No admin actions have been logged yet."
-        emptyIcon="\u2699\uFE0F"
       />
     </div>
   );

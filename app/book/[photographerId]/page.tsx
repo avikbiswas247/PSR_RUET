@@ -279,7 +279,6 @@ export default function BookPhotographerPage({
           <EmptyState
             title="No availability"
             description={`${photographer.full_name} has no available time slots right now. Please check back later.`}
-            icon="&#128337;"
             action={{ label: "Browse photographers", href: "/book" }}
           />
         </div>

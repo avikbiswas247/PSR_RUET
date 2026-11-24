@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PublicEvent } from "@/lib/types/public";
 import { useApi } from "@/lib/hooks/use-api";
 import { notFound } from "next/navigation";
+import { CalendarDays, MapPin } from "lucide-react";
 
 export default function EventDetailPage({
   params,
@@ -82,7 +83,7 @@ export default function EventDetailPage({
               </h1>
               <div className="space-y-3 mb-6">
                 <div className="flex items-start gap-3">
-                  <span aria-hidden="true" className="text-orange">\u260E</span>
+                  <CalendarDays size={17} className="mt-0.5 shrink-0 text-orange" aria-hidden="true" />
                   <div className="min-w-0 break-words [overflow-wrap:anywhere]">
                     <div className="text-sm font-bold">Date</div>
                     <div className="text-muted text-sm">
@@ -97,7 +98,7 @@ export default function EventDetailPage({
                 </div>
                 {event.location && (
                   <div className="flex items-start gap-3">
-                    <span aria-hidden="true" className="text-orange">\u270D\uFE0F</span>
+                    <MapPin size={17} className="mt-0.5 shrink-0 text-orange" aria-hidden="true" />
                     <div>
                       <div className="text-sm font-bold">Location</div>
                       <div className="break-words text-sm text-muted [overflow-wrap:anywhere]">{event.location}</div>
@@ -117,13 +118,11 @@ export default function EventDetailPage({
             <EmptyState
               title="Registration coming soon"
               description="Event registration will be available here."
-              icon="\u270B\uFE0F"
             />
           ) : (
             <EmptyState
               title="Registration not available"
               description="Registration is not enabled for this event."
-              icon="\u26D4\uFE0F"
             />
           )}
         </div>

@@ -63,7 +63,6 @@ export default function AdminPortfoliosPage() {
         loading={loading}
         emptyTitle="No portfolios"
         emptyDescription="No portfolios have been created yet."
-        emptyIcon="\u270D\uFE0F"
       />
     </div>
   );

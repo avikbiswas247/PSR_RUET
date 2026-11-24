@@ -34,7 +34,6 @@ export function EventGrid({ events, loading = false }: EventGridProps) {
       <EmptyState
         title="No events yet"
         description="Check back soon for photo walks, exhibitions, and creative sessions."
-        icon="\u2733\uFE0F"
       />
     );
   }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import { AdminUser } from "@/lib/services/admin.service";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -170,9 +171,7 @@ export default function AdminManagementPage() {
       <div>
         <h2 className="text-[18px] font-bold text-white mb-6">Administrator Accounts</h2>
         {adminAdmins.length === 0 ? (
-          <div className="p-8 rounded-[10px] border border-[rgba(255,255,255,0.13)] bg-[#181817] text-center">
-            <p className="text-muted">No administrator accounts found.</p>
-          </div>
+          <EmptyState compact title="No administrator accounts found" description="Invite a trusted administrator to help manage PSR." />
         ) : (
           <div className="grid gap-4">
             {adminAdmins.map((admin) => (

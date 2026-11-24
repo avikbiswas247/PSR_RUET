@@ -34,7 +34,6 @@ export function ExhibitionGrid({ exhibitions, loading = false }: ExhibitionGridP
       <EmptyState
         title="No exhibitions yet"
         description="Check back soon for curated photographic exhibitions."
-        icon="\u1F5BC\uFE0F"
       />
     );
   }

@@ -102,7 +102,6 @@ export default function AccountDashboardPage() {
                 label: "Browse photographers",
                 href: "/book",
               }}
-              icon="\u270B\uFE0F"
             />
           ) : (
             <div className="space-y-4">
@@ -165,7 +164,6 @@ export default function AccountDashboardPage() {
               <EmptyState
                 title="No photographers available"
                 description="No photographers are currently available for booking."
-                icon="\u270B\uFE0F"
               />
             </div>
           ) : (

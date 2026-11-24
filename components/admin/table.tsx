@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface TableColumn {
   key: string;
@@ -14,7 +15,6 @@ interface AdminTableProps {
   loading?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
-  emptyIcon?: string;
   rowKey?: string;
   className?: string;
 }
@@ -25,7 +25,6 @@ export function AdminTable({
   loading = false,
   emptyTitle = "No records found",
   emptyDescription = "There are no records to display.",
-  emptyIcon = "\u260E",
   rowKey = "id",
   className,
 }: AdminTableProps) {
@@ -53,13 +52,12 @@ export function AdminTable({
 
   if (data.length === 0) {
     return (
-      <div className={`flex flex-col items-center justify-center py-20 text-center ${className || ""}`}>
-        <span className="text-6xl mb-6 opacity-50" aria-hidden="true">
-          {emptyIcon}
-        </span>
-        <h2 className="text-[32px] tracking-tight font-bold mb-4">{emptyTitle}</h2>
-        <p className="text-muted text-lg max-w-[420px]">{emptyDescription}</p>
-      </div>
+      <EmptyState
+        compact
+        title={emptyTitle}
+        description={emptyDescription}
+        className={className}
+      />
     );
   }
 

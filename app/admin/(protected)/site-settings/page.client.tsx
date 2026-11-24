@@ -121,7 +121,6 @@ export default function AdminSiteSettingsPage() {
         loading={loading}
         emptyTitle="No site settings"
         emptyDescription="No site settings have been configured yet."
-        emptyIcon="\u2699\uFE0F"
       />
 
       <div className="mt-8">

@@ -99,7 +99,6 @@ export default function PhotographerPortfolioPage() {
             <EmptyState
               title="No portfolios yet"
               description="Create your first portfolio to organize and showcase your photos."
-              icon="\u270D\uFE0F"
             />
           </div>
         ) : (

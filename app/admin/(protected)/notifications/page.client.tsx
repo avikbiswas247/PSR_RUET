@@ -96,7 +96,6 @@ export default function AdminNotificationsPage() {
         loading={loading}
         emptyTitle="No notifications"
         emptyDescription="There are no notifications yet."
-        emptyIcon="\u2705"
       />
 
       <div className="mt-8">

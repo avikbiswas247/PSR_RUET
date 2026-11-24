@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import Image from "next/image";
+import { Images } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import { useAuth } from "@/components/providers/auth-provider";
 import { PublicPhotographer, PublicPhoto } from "@/lib/types/public";

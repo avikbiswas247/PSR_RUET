@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowUpRight, Camera, Globe, Image as ImageIcon, MapPin, X } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Camera, Globe, MapPin, X } from "lucide-react";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PageContainer } from "@/components/layout/page-container";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import type { CommunityProfileDetail, CommunityProfilePhoto } from "@/lib/types/public";
 
@@ -184,11 +185,11 @@ export function CommunityProfileDetail({ userId }: { userId: string }) {
           </div>
 
           {profile.photos.length === 0 ? (
-            <div className="rounded-2xl border line-border bg-surface-2/60 px-5 py-10 text-center sm:py-14">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-orange/15 bg-orange/[0.07] text-orange"><ImageIcon size={21} /></div>
-              <h3 className="mt-4 font-semibold text-text">No public photos yet</h3>
-              <p className="mt-1 text-sm text-muted">Photos this member chooses to share will appear here.</p>
-            </div>
+            <EmptyState
+              compact
+              title="No public photos yet"
+              description="Photos this member chooses to share will appear here."
+            />
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {profile.photos.map((photo) => (

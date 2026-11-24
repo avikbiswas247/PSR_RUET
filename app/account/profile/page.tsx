@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,12 +70,12 @@ export default function AccountProfilePage() {
 
   if (error) {
     return (
-      <div className="section-pad max-w-[600px] mx-auto text-center">
-        <h1 className="text-[32px] tracking-tight font-bold mb-4">Profile Error</h1>
-        <p className="text-gray-400 mb-6">{error}</p>
-        <Link href="/sign-in" className="text-orange font-bold hover:underline">
-          Sign in again
-        </Link>
+      <div className="section-pad mx-auto max-w-[820px]">
+        <EmptyState
+          title="Unable to load your profile"
+          description={error}
+          action={{ label: "Sign in again", href: "/sign-in" }}
+        />
       </div>
     );
   }
@@ -84,12 +83,12 @@ export default function AccountProfilePage() {
   const profile = profileData;
   if (!profile) {
     return (
-      <div className="section-pad max-w-[600px] mx-auto text-center">
-        <h1 className="text-[32px] tracking-tight font-bold mb-4">No Profile Found</h1>
-        <p className="text-gray-400 mb-6">Please sign in to view your profile.</p>
-        <Link href="/sign-in" className="text-orange font-bold hover:underline">
-          Sign in
-        </Link>
+      <div className="section-pad mx-auto max-w-[820px]">
+        <EmptyState
+          title="Profile not found"
+          description="Sign in to view and update your PSR account profile."
+          action={{ label: "Sign in", href: "/sign-in" }}
+        />
       </div>
     );
   }

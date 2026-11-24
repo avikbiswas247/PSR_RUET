@@ -49,7 +49,6 @@ export default function AccountBookingsPage() {
             label: "Browse photographers",
             href: "/photographers",
           }}
-          icon="\u270B\uFE0F"
         />
       ) : (
         <div className="space-y-4">

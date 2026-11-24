@@ -99,7 +99,6 @@ export default function BookPage() {
           <EmptyState
             title="No photographers available"
             description="No photographers are currently available for booking. Check back soon."
-            icon="&#127926;"
           />
         </div>
       )}

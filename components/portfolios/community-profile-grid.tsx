@@ -34,7 +34,6 @@ export function CommunityProfileGrid({
       <EmptyState
         title="No community profiles yet"
         description="Active PSR member, photographer, and admin profiles will appear here. Client-only accounts stay private."
-        icon="\u263A"
       />
     );
   }

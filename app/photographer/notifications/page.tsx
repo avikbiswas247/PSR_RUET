@@ -83,7 +83,7 @@ export default function PhotographerNotificationsPage() {
       {notice && <div className="form-notice">{notice}</div>}
 
       {notifications.length === 0 ? (
-        <EmptyState title="No notifications" description="You&rsquo;re all caught up." icon="\u2705" />
+        <EmptyState title="No notifications" description="You&rsquo;re all caught up." />
       ) : (
         <div className="space-y-3">
           {notifications.map((n) => (

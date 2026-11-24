@@ -123,7 +123,7 @@ export default function PhotographerAvailabilityPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {slotsList.length === 0 ? (
           <div className="lg:col-span-3">
-            <EmptyState title="No availability slots" description="Add your available time slots so clients can book you." icon="\u260E" />
+            <EmptyState title="No availability slots" description="Add your available time slots so clients can book you." />
           </div>
         ) : (
           slotsList.map((s) => (

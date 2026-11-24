@@ -5,6 +5,7 @@ import { BrandLogo } from "@/components/layout/brand-logo";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CircleCheck } from "lucide-react";
 
 interface ResetPasswordFormProps {
   token: string;
@@ -65,7 +66,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         </form>
       ) : (
         <div className="text-center py-12">
-          <div className="text-orange text-6xl mb-4" aria-hidden="true">\u2705</div>
+          <CircleCheck size={52} strokeWidth={1.6} className="mx-auto mb-5 text-orange" aria-hidden="true" />
           <h2 className="text-[28px] tracking-tight font-bold mb-4">Password reset</h2>
           <p className="text-muted text-lg mb-8">
             Your password has been reset successfully. You can now sign in with your new password.

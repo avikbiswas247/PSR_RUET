@@ -94,7 +94,6 @@ export default function AccountNotificationsPage() {
         <EmptyState
           title="No notifications"
           description="You&rsquo;re all caught up."
-          icon="\u2705"
         />
       ) : (
         <div className="space-y-3">

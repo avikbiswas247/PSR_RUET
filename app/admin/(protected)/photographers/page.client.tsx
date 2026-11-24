@@ -65,7 +65,6 @@ export default function AdminPhotographersPage() {
         loading={loading}
         emptyTitle="No photographers"
         emptyDescription="No photographer profiles have been created yet."
-        emptyIcon="\u270B\uFE0F"
       />
     </div>
   );

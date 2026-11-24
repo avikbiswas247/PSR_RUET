@@ -11,6 +11,7 @@ import {
   ImageIcon,
   CalendarCheck,
   CalendarDays,
+  ClipboardList,
   GalleryVerticalEnd,
   Star,
   Bell,
@@ -53,6 +54,7 @@ const NAV_GROUPS = [
       { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
       { href: "/admin/events", label: "Events", icon: CalendarDays },
       { href: "/admin/exhibitions", label: "Exhibitions", icon: GalleryVerticalEnd },
+      { href: "/admin/participation", label: "Participation Forms", icon: ClipboardList },
     ],
   },
   {

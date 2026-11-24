@@ -63,7 +63,6 @@ export default function AdminPhotosPage() {
         loading={loading}
         emptyTitle="No photos"
         emptyDescription="No photos have been uploaded yet."
-        emptyIcon="\u270B\uFE0F"
       />
     </div>
   );

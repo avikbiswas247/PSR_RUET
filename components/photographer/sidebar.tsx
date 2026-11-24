@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { BrandLogo } from "@/components/layout/brand-logo";
 
@@ -57,7 +58,7 @@ export function PhotographerSidebar({
           onClick={handleSignOut}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-sm text-sm text-muted hover:text-text hover:bg-surface-2 transition-colors"
         >
-          <span aria-hidden="true">\u2718</span>
+          <LogOut size={16} aria-hidden="true" />
           Sign out
         </button>
       </div>

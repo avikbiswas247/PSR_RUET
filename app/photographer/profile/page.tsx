@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import { PhotographerProfileMe } from "@/lib/types/public";
 
@@ -443,16 +444,13 @@ export default function PhotographerProfilePage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1">
           {photos.length === 0 ? (
-            <div className="col-span-4 p-16 text-center text-muted">
-              No photos yet
-              {!editMode && (
-                <Button
-                  onClick={() => setEditMode(true)}
-                  className="mt-4 text-xs px-3 py-1.5"
-                >
-                  Upload your first photo
-                </Button>
-              )}
+            <div className="col-span-full">
+              <EmptyState
+                compact
+                title="No photos yet"
+                description="Your published work will appear here. Add a photo to start building your profile gallery."
+                action={!editMode ? { label: "Upload your first photo", onClick: () => setEditMode(true) } : undefined}
+              />
             </div>
           ) : (
             photos.map((photo) => (

@@ -80,7 +80,6 @@ export default function PortfolioDetailPage({
           <EmptyState
             title="No photos in this portfolio"
             description="This portfolio doesn't have any photos yet."
-            icon="\u270D\uFE0F"
           />
         </div>
       </div>

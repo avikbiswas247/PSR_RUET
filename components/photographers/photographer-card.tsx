@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { MapPin } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 
 interface PhotographerCardProps {
@@ -94,7 +95,7 @@ export function PhotographerCard({
           )}
           {location && (
             <div className="flex min-w-0 items-center gap-1 text-xs text-muted">
-              <span aria-hidden="true">\u260E</span>
+              <MapPin size={13} className="shrink-0 text-orange" aria-hidden="true" />
               <span className="break-words [overflow-wrap:anywhere]">{location}</span>
             </div>
           )}

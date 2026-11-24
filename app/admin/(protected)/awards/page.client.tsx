@@ -123,7 +123,6 @@ export default function AdminAwardsPage() {
         loading={loading}
         emptyTitle="No awards"
         emptyDescription="No awards have been created yet."
-        emptyIcon="\u2728"
       />
     </div>
   );

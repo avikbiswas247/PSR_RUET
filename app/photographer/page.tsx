@@ -109,7 +109,6 @@ export default function PhotographerDashboardPage() {
             <EmptyState
               title="No booking requests yet"
               description="Clients will send booking requests here once you're available."
-              icon="\u270B\uFE0F"
             />
           ) : (
             <div className="space-y-4">

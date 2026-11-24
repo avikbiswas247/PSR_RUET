@@ -91,7 +91,6 @@ export default function AdminMediaPage() {
         loading={loading}
         emptyTitle="No media assets"
         emptyDescription="No media assets have been uploaded yet."
-        emptyIcon="\u270D\uFE0F"
       />
 
       <div className="mt-8">

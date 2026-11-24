@@ -45,7 +45,6 @@ export function PhotographerGrid({
           label: "Join PSR",
           href: "/membership",
         }}
-        icon="\u260E"
       />
     );
   }

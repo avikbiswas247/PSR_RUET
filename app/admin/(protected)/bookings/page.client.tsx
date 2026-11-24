@@ -67,7 +67,6 @@ export default function AdminBookingsPage() {
         loading={loading}
         emptyTitle="No bookings"
         emptyDescription="There are no bookings in the system yet."
-        emptyIcon="\u270B\uFE0F"
       />
 
       <div className="mt-8">

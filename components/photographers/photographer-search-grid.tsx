@@ -167,21 +167,21 @@ export function PhotographerSearchGrid({
           </div>
 
           {photographers.length === 0 ? (
-            <div className="rounded-2xl border border-line-border py-16 text-center">
+            <div className="text-center">
               <EmptyState
+                compact
                 title="No photographers found"
                 description={
                   hasFilters
                     ? "Try adjusting your search or filters."
                     : "No photographers are currently available."
                 }
-                icon="✋"
               />
 
               {hasFilters && (
                 <button
                   onClick={handleClear}
-                  className="mt-4 text-sm font-semibold text-orange hover:underline"
+                  className="mt-4 text-sm font-semibold text-orange transition hover:text-orange/80 hover:underline"
                 >
                   Clear all filters
                 </button>

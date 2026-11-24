@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PublicExhibition } from "@/lib/types/public";
 import { useApi } from "@/lib/hooks/use-api";
 import { notFound } from "next/navigation";
+import { CalendarDays, MapPin } from "lucide-react";
 
 export default function ExhibitionDetailPage({
   params,
@@ -82,7 +83,7 @@ export default function ExhibitionDetailPage({
               </h1>
               <div className="space-y-3 mb-6">
                 <div className="flex items-start gap-3">
-                  <span aria-hidden="true" className="text-orange">\u270D\uFE0F</span>
+                  <MapPin size={17} className="mt-0.5 shrink-0 text-orange" aria-hidden="true" />
                   <div className="min-w-0 break-words [overflow-wrap:anywhere]">
                     <div className="text-sm font-bold">Venue</div>
                     <div className="break-words text-sm text-muted [overflow-wrap:anywhere]">
@@ -92,7 +93,7 @@ export default function ExhibitionDetailPage({
                 </div>
                 {exhibition.start_date && (
                   <div className="flex items-start gap-3">
-                    <span aria-hidden="true" className="text-orange">\u260E</span>
+                    <CalendarDays size={17} className="mt-0.5 shrink-0 text-orange" aria-hidden="true" />
                     <div>
                       <div className="text-sm font-bold">Date</div>
                     <div className="break-words text-sm text-muted [overflow-wrap:anywhere]">
@@ -118,7 +119,6 @@ export default function ExhibitionDetailPage({
           <EmptyState
             title="No exhibition items yet"
             description="This exhibition doesn't have any photos on display yet."
-            icon="\u1F5BC\uFE0F"
           />
         </div>
       </div>

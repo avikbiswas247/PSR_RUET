@@ -47,7 +47,6 @@ export default function PhotographerBookingsPage() {
           title="No bookings yet"
           description="Clients will send booking requests here once you're available."
           action={{ label: "Set availability", href: "/photographer/availability" }}
-          icon="\u270B\uFE0F"
         />
       ) : (
         <div className="space-y-4">
