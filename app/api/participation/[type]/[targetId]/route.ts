@@ -14,7 +14,7 @@ export async function POST(request: Request, {params}: Params) {
     const answers=body.answers??{}; for(const field of (form.fields as ParticipationField[])) if(field.required&&!String(answers[field.id]??"").trim()) return jsonOk({message:`${field.label} is required.`},422);
     if(form.is_paid&&!body.transactionNumber?.trim()) return jsonOk({message:"Enter your bKash transaction number to submit."},422);
     if(await hasSubmission(form.id,email)) return jsonOk({message:"A request with this email has already been submitted."},409);
-    const photos=(body.photoUrls??[]).map(x=>String(x).trim()).filter(x=>/^https:\/\//.test(x)).slice(0,100);
+    const photos=form.image_submissions_enabled?(body.photoUrls??[]).map(x=>String(x).trim()).filter(x=>/^https:\/\//.test(x)).slice(0,100):[];
     return jsonOk(await submitRequest(form.id,{full_name:fullName,email,phone,department,answers,transaction_number:body.transactionNumber?.trim()||null,photo_urls:photos}),201);
   } catch(e) { return handleApiError(e); }
 }

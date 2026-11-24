@@ -1,14 +1,14 @@
 import { many, one } from "./_shared";
 
 export type ParticipationField = { id: string; label: string; type: "text" | "textarea" | "number" | "select" | "email" | "tel"; required: boolean; options?: string[] };
-export type ParticipationForm = { id: string; target_type: "event" | "exhibition"; target_id: string; title: string; fields: ParticipationField[]; is_paid: boolean; bkash_numbers: string[]; enabled: boolean };
+export type ParticipationForm = { id: string; target_type: "event" | "exhibition"; target_id: string; title: string; fields: ParticipationField[]; is_paid: boolean; bkash_numbers: string[]; enabled: boolean; image_submissions_enabled: boolean };
 export type ParticipationRequest = { id: string; form_id: string; full_name: string; email: string; phone: string; department: string; answers: Record<string,string>; transaction_number: string|null; photo_urls: string[]; selected_photo_urls: string[]; status: "PENDING"|"ACCEPTED"|"DECLINED"; is_selected: boolean; submitted_at: string };
 
 export async function getForm(type: string, id: string) {
   return one<ParticipationForm>(`SELECT f.*, COALESCE(e.title, x.title, 'Registration') AS title FROM participation_forms f LEFT JOIN events e ON f.target_type='event' AND e.id=f.target_id LEFT JOIN exhibitions x ON f.target_type='exhibition' AND x.id=f.target_id WHERE f.target_type=$1 AND f.target_id=$2`, [type,id]);
 }
-export async function saveForm(type: "event"|"exhibition", id: string, fields: ParticipationField[], isPaid: boolean, numbers: string[], enabled: boolean) {
-  return one<ParticipationForm>(`INSERT INTO participation_forms(target_type,target_id,fields,is_paid,bkash_numbers,enabled) VALUES($1,$2,$3::jsonb,$4,$5,$6) ON CONFLICT(target_type,target_id) DO UPDATE SET fields=EXCLUDED.fields,is_paid=EXCLUDED.is_paid,bkash_numbers=EXCLUDED.bkash_numbers,enabled=EXCLUDED.enabled,updated_at=NOW() RETURNING *`, [type,id,JSON.stringify(fields),isPaid,numbers,enabled]);
+export async function saveForm(type: "event"|"exhibition", id: string, fields: ParticipationField[], isPaid: boolean, numbers: string[], enabled: boolean, imageSubmissionsEnabled: boolean) {
+  return one<ParticipationForm>(`INSERT INTO participation_forms(target_type,target_id,fields,is_paid,bkash_numbers,enabled,image_submissions_enabled) VALUES($1,$2,$3::jsonb,$4,$5,$6,$7) ON CONFLICT(target_type,target_id) DO UPDATE SET fields=EXCLUDED.fields,is_paid=EXCLUDED.is_paid,bkash_numbers=EXCLUDED.bkash_numbers,enabled=EXCLUDED.enabled,image_submissions_enabled=EXCLUDED.image_submissions_enabled,updated_at=NOW() RETURNING *`, [type,id,JSON.stringify(fields),isPaid,numbers,enabled,imageSubmissionsEnabled]);
 }
 export async function submitRequest(formId: string, input: Omit<ParticipationRequest,"id"|"form_id"|"status"|"is_selected"|"submitted_at"|"selected_photo_urls">) {
   return one<ParticipationRequest>(`INSERT INTO participation_requests(form_id,full_name,email,phone,department,answers,transaction_number,photo_urls) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8) RETURNING *`, [formId,input.full_name,input.email,input.phone,input.department,JSON.stringify(input.answers),input.transaction_number,input.photo_urls]);

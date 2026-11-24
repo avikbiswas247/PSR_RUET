@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS participation_forms (
   is_paid BOOLEAN NOT NULL DEFAULT FALSE,
   bkash_numbers TEXT[] NOT NULL DEFAULT '{}',
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  image_submissions_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (target_type, target_id)
