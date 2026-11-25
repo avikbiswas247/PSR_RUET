@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS participation_forms (
   bkash_numbers TEXT[] NOT NULL DEFAULT '{}',
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   image_submissions_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  video_submissions_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (target_type, target_id)
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS participation_requests (
   answers JSONB NOT NULL DEFAULT '{}'::jsonb,
   transaction_number TEXT,
   photo_urls TEXT[] NOT NULL DEFAULT '{}',
+  video_urls TEXT[] NOT NULL DEFAULT '{}',
   selected_photo_urls TEXT[] NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'DECLINED')),
   is_selected BOOLEAN NOT NULL DEFAULT FALSE,

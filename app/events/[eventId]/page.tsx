@@ -4,7 +4,7 @@ import { use } from "react";
 import { PageContainer } from "@/components/layout/page-container";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { SkipToContent } from "@/components/layout/skip-to-content";
-import { EmptyState } from "@/components/ui/empty-state";
+import { ParticipationEntryLink } from "@/components/events/participation-entry-link";
 import { PublicEvent } from "@/lib/types/public";
 import { useApi } from "@/lib/hooks/use-api";
 import { notFound } from "next/navigation";
@@ -114,17 +114,7 @@ export default function EventDetailPage({
           <p className="mb-6 break-words leading-relaxed text-muted [overflow-wrap:anywhere]">
             {event?.description || "No description available."}
           </p>
-          {event?.registration_enabled ? (
-            <EmptyState
-              title="Registration coming soon"
-              description="Event registration will be available here."
-            />
-          ) : (
-            <EmptyState
-              title="Registration not available"
-              description="Registration is not enabled for this event."
-            />
-          )}
+          <ParticipationEntryLink type="event" targetId={eventId} title={event.title || "this event"}/>
         </div>
       </div>
     </PageContainer>

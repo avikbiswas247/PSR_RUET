@@ -6,7 +6,7 @@ import { Plus, Trash2, X } from "lucide-react";
 type FormKind = "event" | "exhibition";
 type Target = { id: string; title: string | null; slug: string };
 type FormField = { id: string; label: string; type: "text" | "textarea" | "number" | "select" | "email" | "tel"; required: boolean; options?: string[] };
-type SavedForm = { fields: FormField[]; is_paid: boolean; bkash_numbers: string[]; enabled: boolean; image_submissions_enabled: boolean };
+type SavedForm = { fields: FormField[]; is_paid: boolean; bkash_numbers: string[]; enabled: boolean; image_submissions_enabled: boolean; video_submissions_enabled: boolean };
 const input = "w-full rounded-md border border-line-border bg-[#171717] px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-orange focus:outline-none";
 async function api(url: string, method = "GET", body?: unknown) { const response = await fetch(url, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined }); const json = await response.json(); if (!response.ok) throw new Error(json.error?.message || json.message || json.data?.message || "Request failed"); return json.data; }
 const newField = (): FormField => ({ id: crypto.randomUUID(), label: "New question", type: "text", required: false });
@@ -19,6 +19,7 @@ export function ParticipationFormBuilder({ kind, onClose }: { kind: FormKind; on
   const [bkash, setBkash] = React.useState("");
   const [enabled, setEnabled] = React.useState(true);
   const [imageSubmissions, setImageSubmissions] = React.useState(true);
+  const [videoSubmissions, setVideoSubmissions] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [saved, setSaved] = React.useState(false);
@@ -27,10 +28,10 @@ export function ParticipationFormBuilder({ kind, onClose }: { kind: FormKind; on
 
   async function chooseTarget(id: string) {
     setTargetId(id); setSaved(false); setError("");
-    if (!id) { setFields([]); setPaid(false); setBkash(""); setEnabled(true); setImageSubmissions(true); return; }
+    if (!id) { setFields([]); setPaid(false); setBkash(""); setEnabled(true); setImageSubmissions(true); setVideoSubmissions(true); return; }
     try {
       const existing = await api(`/api/admin/participation/forms?type=${kind}&targetId=${id}`) as SavedForm | null;
-      setFields(existing?.fields ?? []); setPaid(existing?.is_paid ?? false); setBkash(existing?.bkash_numbers?.join(", ") ?? ""); setEnabled(existing?.enabled ?? true); setImageSubmissions(existing?.image_submissions_enabled ?? true);
+      setFields(existing?.fields ?? []); setPaid(existing?.is_paid ?? false); setBkash(existing?.bkash_numbers?.join(", ") ?? ""); setEnabled(existing?.enabled ?? true); setImageSubmissions(existing?.image_submissions_enabled ?? true); setVideoSubmissions(existing?.video_submissions_enabled ?? true);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to load the registration form."); }
   }
 
@@ -40,7 +41,7 @@ export function ParticipationFormBuilder({ kind, onClose }: { kind: FormKind; on
     if (paid && !bkash.trim()) { setError("Enter the bKash number participants should pay."); return; }
     setBusy(true); setError("");
     try {
-      await api("/api/admin/participation/forms", "POST", { type: kind, targetId, fields, isPaid: paid, bkashNumbers: paid ? bkash.split(",").map(value => value.trim()).filter(Boolean) : [], enabled, imageSubmissionsEnabled: imageSubmissions });
+      await api("/api/admin/participation/forms", "POST", { type: kind, targetId, fields, isPaid: paid, bkashNumbers: paid ? bkash.split(",").map(value => value.trim()).filter(Boolean) : [], enabled, imageSubmissionsEnabled: imageSubmissions, videoSubmissionsEnabled: videoSubmissions });
       setSaved(true);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save registration form."); }
     finally { setBusy(false); }
@@ -68,7 +69,8 @@ export function ParticipationFormBuilder({ kind, onClose }: { kind: FormKind; on
         {paid && <label className="text-xs text-muted">bKash number for payment<input required type="tel" className={`${input} mt-1`} placeholder="01XXXXXXXXX" value={bkash} onChange={e => setBkash(e.target.value)}/></label>}
       </div>
       <div className="grid gap-3 rounded-lg border border-line-border p-4 sm:grid-cols-2">
-        <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 accent-orange" checked={imageSubmissions} onChange={e => setImageSubmissions(e.target.checked)}/><span><strong>Allow image submissions</strong><span className="mt-1 block text-xs text-muted">Participants can add photo links. Turn this off to remove that option from their form.</span></span></label>
+        <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 accent-orange" checked={imageSubmissions} onChange={e => setImageSubmissions(e.target.checked)}/><span><strong>Allow image submissions</strong><span className="mt-1 block text-xs text-muted">Participants can add image links. Turn this off to remove that option from their form.</span></span></label>
+        <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 accent-orange" checked={videoSubmissions} onChange={e => setVideoSubmissions(e.target.checked)}/><span><strong>Allow video submissions</strong><span className="mt-1 block text-xs text-muted">Participants can add links to their video work.</span></span></label>
         <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 accent-orange" checked={enabled} onChange={e => setEnabled(e.target.checked)}/><span><strong>Accepting responses</strong><span className="mt-1 block text-xs text-muted">The form is available to participants while enabled.</span></span></label>
       </div>
       {saved && <p className="break-all rounded-md bg-surface-2 p-3 text-sm">Public form: <a className="text-orange underline" href={`/participate/${kind}/${targetId}`} target="_blank" rel="noreferrer">{typeof window === "undefined" ? "" : window.location.origin}/participate/{kind}/{targetId}</a></p>}

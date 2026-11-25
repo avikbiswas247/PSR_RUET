@@ -9,6 +9,7 @@ import { PublicExhibition } from "@/lib/types/public";
 import { useApi } from "@/lib/hooks/use-api";
 import { notFound } from "next/navigation";
 import { CalendarDays, MapPin } from "lucide-react";
+import { ParticipationEntryLink } from "@/components/events/participation-entry-link";
 
 export default function ExhibitionDetailPage({
   params,
@@ -120,6 +121,7 @@ export default function ExhibitionDetailPage({
             title="No exhibition items yet"
             description="This exhibition doesn't have any photos on display yet."
           />
+          <ParticipationEntryLink type="exhibition" targetId={id} title={exhibition.title || "this exhibition"}/>
         </div>
       </div>
     </PageContainer>
