@@ -4,9 +4,30 @@ import Image from "next/image";
 type Field={id:string;label:string;type:"text"|"textarea"|"number"|"select"|"email"|"tel";required:boolean;options?:string[]};
 type Form={title:string;fields:Field[];is_paid:boolean;bkash_numbers:string[];enabled:boolean;image_submissions_enabled:boolean;video_submissions_enabled:boolean};
 const input="w-full rounded-md border border-line-border bg-[#171717] px-3 py-3 text-sm text-text placeholder:text-muted focus:border-orange focus:outline-none";
+function getResponseMessage(payload:unknown,status:number,statusText:string){
+ const data=payload&&typeof payload==="object"?payload as {message?:unknown;error?:{message?:unknown};data?:{message?:unknown;error?:{message?:unknown}}}:null;
+ const candidates=[data?.error?.message,data?.data?.error?.message,data?.data?.message,data?.message];
+ const message=candidates.find((value):value is string=>typeof value==="string"&&value.trim().length>0);
+ return message||`Request failed (${status}${statusText?` ${statusText}`:""}).`;
+}
 export default function ParticipationForm({type,targetId}:{type:string;targetId:string}){const [form,setForm]=React.useState<Form|null>(null),[values,setValues]=React.useState<Record<string,string>>({}),[photos,setPhotos]=React.useState<string[]>([]),[videos,setVideos]=React.useState<string[]>([]),[message,setMessage]=React.useState(""),[busy,setBusy]=React.useState(false);
  React.useEffect(()=>{fetch(`/api/participation/${type}/${targetId}`).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error?.message||j.message||"Registration is closed.");setForm(j.data);}).catch(e=>setMessage(e.message));},[type,targetId]);
- async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const formElement=e.currentTarget;setBusy(true);setMessage("");const d=new FormData(formElement);try{const response=await fetch(`/api/participation/${type}/${targetId}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fullName:d.get("fullName"),email:d.get("email"),phone:d.get("phone"),department:d.get("department"),transactionNumber:d.get("transactionNumber"),answers:values,photoUrls:photos,videoUrls:videos})});const j=await response.json();if(!response.ok)throw new Error(j.error?.message||j.message||"Unable to submit request.");setMessage("Your participation request was submitted. The team will email you after review.");formElement.reset();setValues({});setPhotos([]);setVideos([]);}catch(e){setMessage(e instanceof Error?e.message:"Unable to submit request.");}finally{setBusy(false);}}
+ async function submit(e:React.FormEvent<HTMLFormElement>){
+  e.preventDefault();
+  const formElement=e.currentTarget;
+  setBusy(true);setMessage("");
+  const d=new FormData(formElement);
+  try{
+   const response=await fetch(`/api/participation/${type}/${targetId}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fullName:d.get("fullName"),email:d.get("email"),phone:d.get("phone"),department:d.get("department"),transactionNumber:d.get("transactionNumber"),answers:values,photoUrls:photos,videoUrls:videos})});
+   const payload:unknown=await response.json().catch(()=>null);
+   if(!response.ok)throw new Error(getResponseMessage(payload,response.status,response.statusText));
+   setMessage("Your participation request was submitted. The team will email you after review.");
+   formElement.reset();setValues({});setPhotos([]);setVideos([]);
+  }catch(error){
+   const detail=error instanceof Error?error.message:typeof error==="string"?error:"The request failed for an unknown reason.";
+   setMessage(detail);
+  }finally{setBusy(false);}
+ }
  return <main className="min-h-screen bg-[#090909] px-4 py-10 text-text sm:py-16"><div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-line-border bg-surface"><div className="border-b-4 border-orange p-6 sm:p-9"><Image src="/psr-logo-dark.png" alt="PSR Photographic Society" width={250} height={75} className="mb-8 h-auto w-48"/><p className="mb-2 text-xs font-semibold uppercase tracking-[.18em] text-orange">Photographic Society RUET</p><h1 className="text-3xl font-bold">{form?.title||"Participation registration"}</h1><p className="mt-2 text-sm text-muted">Complete the form to request your place.</p></div>
  {message&&<p role="status" className="mx-6 mt-6 rounded-md border border-orange/30 bg-orange/10 p-3 text-sm text-text sm:mx-9">{message}</p>}
  {form&&<form onSubmit={submit} className="space-y-5 p-6 sm:p-9"><div className="grid gap-4 sm:grid-cols-2"><label className="text-xs text-muted">Full name<input required name="fullName" autoComplete="name" className={`${input} mt-1`}/></label><label className="text-xs text-muted">Email<input required name="email" type="email" autoComplete="email" className={`${input} mt-1`}/></label><label className="text-xs text-muted">Phone number<input required name="phone" type="tel" autoComplete="tel" className={`${input} mt-1`}/></label><label className="text-xs text-muted">Department<input required name="department" className={`${input} mt-1`}/></label></div>
