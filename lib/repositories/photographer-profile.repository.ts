@@ -28,12 +28,30 @@ export function getPhotographerProfileByUserId(userId: string) {
   return one<PhotographerProfile>(`SELECT * FROM ${TABLE} WHERE user_id = $1 LIMIT 1`, [userId]);
 }
 
-export function listPhotographerProfiles(limit = 50, offset = 0, filters?: { search?: string | null; genre?: string | null; device?: string | null; location?: string | null; includeInactive?: boolean }) {
+export function listPhotographerProfiles(limit = 50, offset = 0, filters?: { search?: string | null; genre?: string | null; device?: string | null; location?: string | null; includeInactive?: boolean; availableOnly?: boolean }) {
   const conditions: string[] = filters?.includeInactive
     ? []
     : ["(pp.user_id IS NULL OR (u.id IS NOT NULL AND u.is_active = TRUE AND u.deleted_at IS NULL AND u.email_verified_at IS NOT NULL))"];
   const params: unknown[] = [];
   let paramIndex = 1;
+
+  if (filters?.availableOnly) {
+    conditions.push("pp.is_available = TRUE");
+    conditions.push(`EXISTS (
+      SELECT 1 FROM photographer_availability pa
+      WHERE pa.photographer_id = pp.user_id
+        AND pa.is_available = TRUE
+        AND pa.available_date BETWEEN (NOW() AT TIME ZONE 'Asia/Dhaka')::date
+          AND (NOW() AT TIME ZONE 'Asia/Dhaka')::date + 90
+        AND NOT EXISTS (
+          SELECT 1 FROM bookings b
+          WHERE b.photographer_id = pa.photographer_id
+            AND b.booking_date = pa.available_date
+            AND b.status IN ('PENDING', 'ACCEPTED', 'CONFIRMED')
+            AND b.start_time < pa.end_time AND b.end_time > pa.start_time
+        )
+    )`);
+  }
 
   if (filters?.search) {
     conditions.push(`(u.full_name ILIKE $${paramIndex} OR pp.bio ILIKE $${paramIndex + 1} OR pp.title ILIKE $${paramIndex + 2})`);

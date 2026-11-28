@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useApi } from "@/lib/hooks/use-api";
 import { PublicBooking } from "@/lib/types/public";
 import { notFound } from "next/navigation";
+import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 
 export default function PhotographerBookingDetailPage({
   params,
@@ -17,6 +18,7 @@ export default function PhotographerBookingDetailPage({
     `/api/bookings/${bookingId}`
   );
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
   if (loading) {
     return (
@@ -35,17 +37,20 @@ export default function PhotographerBookingDetailPage({
   const b = data;
 
   const updateStatus = async (status: string) => {
+    if (["REJECTED", "CANCELLED"].includes(status) && !window.confirm(`Are you sure you want to ${status.toLowerCase()} this booking?`)) return;
     setBusy(true);
+    setNotice("");
     try {
       const res = await fetch(`/api/bookings/${b.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Unable to update booking status.");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error?.message || json.message || "Unable to update booking status.");
       window.location.reload();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Unable to update status.");
+      setNotice(err instanceof Error ? err.message : "Unable to update status.");
     } finally {
       setBusy(false);
     }
@@ -72,27 +77,13 @@ export default function PhotographerBookingDetailPage({
             <h2 className="text-[24px] font-bold">{b.title || "Untitled booking"}</h2>
             <p className="text-sm text-muted">{b.booking_number}</p>
           </div>
-          <span
-            className={`text-[10px] uppercase tracking-wider font-bold border rounded px-3 py-1 ${
-              b.status === "CONFIRMED"
-                ? "text-orange bg-orange/10 border border-orange/20"
-                : b.status === "PENDING"
-                ? "text-orange border-orange/20 bg-oradeep/5"
-                : b.status === "ACCEPTED"
-                ? "text-orange bg-orange/10 border border-orange/20"
-                : b.status === "REJECTED"
-                ? "text-orange bg-orange/20 border border-orange-deep/30"
-                : b.status === "CANCELLED"
-                ? "text-muted border-line-border bg-transparent"
-                : b.status === "COMPLETED"
-                ? "text-muted border-line-border bg-transparent"
-                : "text-muted border-line-border bg-transparent"
-            }`}
-          >
-            {b.status}
-          </span>
+          <BookingStatusBadge status={b.status} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <p className="text-xs font-bold tracking-wider uppercase text-muted mb-1">Service</p>
+            <p className="text-muted">{b.photography_type || "Not specified"}</p>
+          </div>
           <div>
             <p className="text-xs font-bold tracking-wider uppercase text-muted mb-1">Date</p>
             <p className="text-muted">
@@ -117,13 +108,36 @@ export default function PhotographerBookingDetailPage({
             <p className="text-muted">{b.budget ? `BDT ${b.budget}` : "Not specified"}</p>
           </div>
         </div>
+        {notice && <p role="alert" className="mt-5 rounded-sm border border-orange/30 bg-orange/5 p-3 text-sm text-orange">{notice}</p>}
         {b.description && (
           <div className="mt-6">
-            <p className="text-xs font-bold tracking-wider uppercase text-muted mb-2">Description</p>
+            <p className="text-xs font-bold tracking-wider uppercase text-muted mb-2">Message from client</p>
             <p className="text-muted">{b.description}</p>
           </div>
         )}
       </div>
+
+      {b.client_profile && (
+        <section className="rounded-sm border line-border bg-surface p-6">
+          <h2 className="mb-4 text-[20px] font-bold">Client profile</h2>
+          <div className="flex items-center gap-4">
+            {b.client_profile.avatar_url ? (
+              <img src={b.client_profile.avatar_url} alt="" className="h-16 w-16 rounded-full border line-border object-cover" />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border line-border bg-surface-2 text-xl font-bold text-orange">
+                {b.client_profile.full_name.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-lg font-semibold">{b.client_profile.full_name}</p>
+              {b.client_profile.organization_name && <p className="mt-1 text-sm text-muted">{b.client_profile.organization_name}</p>}
+              <a href={`mailto:${b.client_profile.email}`} className="mt-1 block text-sm text-orange hover:underline">{b.client_profile.email}</a>
+              {b.client_profile.phone && <a href={`tel:${b.client_profile.phone}`} className="mt-1 block text-sm text-orange hover:underline">{b.client_profile.phone}</a>}
+              <p className="mt-1 text-xs text-muted">Joined {new Date(b.client_profile.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {b.status === "PENDING" && (
         <div className="p-6 rounded-sm border line-border bg-surface space-y-3">
@@ -168,12 +182,21 @@ export default function PhotographerBookingDetailPage({
               </button>
             )}
             <button
-              onClick={() => updateStatus("COMPLETED")}
-              className="button button-primary flex-1"
+              onClick={() => updateStatus("CANCELLED")}
+              className="button button-outline flex-1"
               disabled={busy}
             >
-              Mark completed
+              Cancel booking
             </button>
+            {b.status === "CONFIRMED" && (
+              <button
+                onClick={() => updateStatus("COMPLETED")}
+                className="button button-primary flex-1"
+                disabled={busy}
+              >
+                Mark completed
+              </button>
+            )}
           </div>
         </div>
       )}

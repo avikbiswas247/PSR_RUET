@@ -42,7 +42,7 @@ export default function PhotographerDetailPage({
     ? `/api/availability?photographerId=${photographer.user_id}&from=${localDateString(new Date())}&to=${localDateString(availabilityEnd)}`
     : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
   const { data: slots } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
-  const openSlots = (slots ?? []).filter((slot) => slot.is_available);
+  const openSlots = photographer?.is_available ? (slots ?? []).filter((slot) => slot.is_available) : [];
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followBusy, setFollowBusy] = useState(false);
@@ -60,18 +60,6 @@ export default function PhotographerDetailPage({
         });
     }
   }, [photographerId, user, isValidUuid]);
-
-  if (!isValidUuid) {
-    return (
-      <div className="section-pad max-w-[720px] mx-auto text-center">
-        <h1 className="text-[40px] tracking-tight font-bold mb-8">Invalid Photographer</h1>
-        <p className="text-gray-400 mb-6">The photographer identifier is not valid.</p>
-        <Link href="/photographers" className="text-orange font-bold hover:underline">
-          Browse photographers
-        </Link>
-      </div>
-    );
-  }
 
   const isOwn =
     !!user && !!photographer?.user_id && user.id === photographer.user_id;
@@ -132,6 +120,18 @@ export default function PhotographerDetailPage({
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [modalOpen]);
+
+  if (!isValidUuid) {
+    return (
+      <div className="section-pad max-w-[720px] mx-auto text-center">
+        <h1 className="text-[40px] tracking-tight font-bold mb-8">Invalid Photographer</h1>
+        <p className="text-gray-400 mb-6">The photographer identifier is not valid.</p>
+        <Link href="/photographers" className="text-orange font-bold hover:underline">
+          Browse photographers
+        </Link>
+      </div>
+    );
+  }
 
   if (loading || photosLoading) {
     return (

@@ -162,6 +162,7 @@ export default function PhotographerDashboardPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm font-bold">{b.title || "Untitled booking"}</h3>
+                    {b.client_profile?.full_name && <p className="text-xs text-muted">From {b.client_profile.full_name}</p>}
                     <p className="text-xs text-muted">{String(b.booking_date)} &bull; {String(b.start_time)} &ndash; {String(b.end_time)}</p>
                     <span
                       className={`text-[10px] uppercase tracking-wider font-bold border rounded px-2 py-0.5 ${

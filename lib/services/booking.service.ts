@@ -1,65 +1,300 @@
+import { randomBytes } from "node:crypto";
+import { transaction } from "@/lib/db";
 import * as BookingRepo from "@/lib/repositories/booking.repository";
-import * as AvailabilityRepo from "@/lib/repositories/photographer-availability.repository";
 import * as MessageRepo from "@/lib/repositories/booking-message.repository";
 import * as PaymentRepo from "@/lib/repositories/booking-payment.repository";
 import * as NotificationRepo from "@/lib/repositories/notification.repository";
 import * as UserRepo from "@/lib/repositories/user.repository";
-export class BookingServiceError extends Error { constructor(message: string, public code: string) { super(message); this.name = "BookingServiceError"; } }
-export async function requestBooking(i: { authenticatedClientId: string; photographerId: string; title: string; description?: string|null; photographyType?: string|null; location?: string|null; bookingDate: string; startTime: string; endTime: string; budget?: number|null; bookingNumber: string }) {
-  if (!i.title.trim()) throw new BookingServiceError("Title is required.","INVALID_TITLE");
-  if (i.endTime <= i.startTime) throw new BookingServiceError("End time must be later than start time.","INVALID_TIME");
-  if (i.budget != null && (!Number.isFinite(i.budget)||i.budget<0)) throw new BookingServiceError("Budget cannot be negative.","INVALID_BUDGET");
-  const slot=await AvailabilityRepo.findAvailableSlot(i.photographerId,i.bookingDate,i.startTime,i.endTime);
-  if(!slot) throw new BookingServiceError("Photographer has no matching available slot.","SLOT_UNAVAILABLE");
-  const booking = await BookingRepo.createBooking({booking_number:i.bookingNumber,client_id:i.authenticatedClientId,photographer_id:i.photographerId,title:i.title.trim(),description:i.description??null,photography_type:i.photographyType??null,location:i.location??null,booking_date:i.bookingDate,start_time:i.startTime,end_time:i.endTime,budget:i.budget??null,status:"PENDING"});
-  // Notify the photographer of the new booking request
+import * as ClientProfileRepo from "@/lib/repositories/client-profile.repository";
+import * as PhotographerProfileRepo from "@/lib/repositories/photographer-profile.repository";
+
+export class BookingServiceError extends Error {
+  constructor(message: string, public code: string) {
+    super(message);
+    this.name = "BookingServiceError";
+  }
+}
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ["ACCEPTED", "REJECTED", "CANCELLED"],
+  ACCEPTED: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["COMPLETED", "CANCELLED"],
+};
+
+function dhakaDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function addDays(date: string, days: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+function isValidIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function timeValue(value: string) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(value);
+  if (!match) return null;
+  return (Number(match[1]) * 60 + Number(match[2])) * 60 + Number(match[3] ?? 0);
+}
+
+function createBookingNumber() {
+  return `PSR-${Date.now().toString(36).toUpperCase()}-${randomBytes(6).toString("hex").toUpperCase()}`;
+}
+
+export async function requestBooking(input: {
+  authenticatedClientId: string;
+  photographerId: string;
+  title: string;
+  description?: string | null;
+  photographyType?: string | null;
+  location?: string | null;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  budget?: number | null;
+}) {
+  const title = input.title.trim();
+  const description = input.description?.trim() ?? "";
+  const photographyType = input.photographyType?.trim() ?? "";
+  const location = input.location?.trim() ?? "";
+  if (!title || title.length > 120) throw new BookingServiceError("Enter a session title up to 120 characters.", "INVALID_TITLE");
+  if (!description || description.length > 2000) throw new BookingServiceError("A booking message is required and must be 2,000 characters or less.", "INVALID_MESSAGE");
+  if (photographyType.length > 80) throw new BookingServiceError("Choose a valid photography service.", "INVALID_SERVICE");
+  if (location.length > 240) throw new BookingServiceError("Location must be 240 characters or less.", "INVALID_LOCATION");
+  if (!isValidIsoDate(input.bookingDate)) throw new BookingServiceError("Choose a valid session date.", "INVALID_DATE");
+  const firstBookableDate = dhakaDate();
+  const lastBookableDate = addDays(firstBookableDate, 90);
+  if (input.bookingDate < firstBookableDate) throw new BookingServiceError("The session date cannot be in the past.", "PAST_DATE");
+  if (input.bookingDate > lastBookableDate) throw new BookingServiceError("Choose a date within the next 90 days.", "DATE_OUT_OF_RANGE");
+  const startValue = timeValue(input.startTime);
+  const endValue = timeValue(input.endTime);
+  if (startValue === null || endValue === null || endValue <= startValue) {
+    throw new BookingServiceError("Choose a valid time range. The end time must be later than the start time.", "INVALID_TIME");
+  }
+  if (input.budget != null && (!Number.isFinite(input.budget) || input.budget < 0 || input.budget > 1_000_000_000)) {
+    throw new BookingServiceError("Enter a valid non-negative budget in BDT.", "INVALID_BUDGET");
+  }
+
+  const booking = await transaction(async (client) => {
+    if (!await BookingRepo.hasActiveClientRole(client, input.authenticatedClientId)) {
+      throw new BookingServiceError("A client account is required to request a booking.", "FORBIDDEN");
+    }
+    const photographerUserId = await BookingRepo.resolveActivePhotographer(client, input.photographerId);
+    if (!photographerUserId) throw new BookingServiceError("This photographer is unavailable for booking.", "PHOTOGRAPHER_UNAVAILABLE");
+
+    // The advisory lock serializes requests for this photographer/date. The row
+    // lock protects the selected availability record while validation and insert run.
+    await BookingRepo.lockPhotographerDate(client, photographerUserId, input.bookingDate);
+    const slot = await BookingRepo.lockAvailableSlot(client, {
+      photographerId: photographerUserId,
+      date: input.bookingDate,
+      startTime: input.startTime,
+      endTime: input.endTime,
+    });
+    if (!slot) throw new BookingServiceError("That time is no longer available. Choose another slot.", "SLOT_UNAVAILABLE");
+
+    const hasConflict = await BookingRepo.hasOverlappingActiveBooking(client, {
+      photographerId: photographerUserId,
+      date: input.bookingDate,
+      startTime: input.startTime,
+      endTime: input.endTime,
+    });
+    if (hasConflict) throw new BookingServiceError("That time was just booked. Choose another available slot.", "SLOT_CONFLICT");
+
+    return BookingRepo.createBookingInTransaction(client, {
+      booking_number: createBookingNumber(),
+      client_id: input.authenticatedClientId,
+      photographer_id: photographerUserId,
+      title,
+      description,
+      photography_type: photographyType || null,
+      location: location || null,
+      booking_date: input.bookingDate,
+      start_time: input.startTime,
+      end_time: input.endTime,
+      budget: input.budget ?? null,
+      status: "PENDING",
+    });
+  });
+
+  const clientUser = await UserRepo.getUserById(input.authenticatedClientId).catch(() => null);
+  await notifyBookingParticipant(booking.photographer_id, {
+    title: "New Booking Request",
+    message: `${clientUser?.full_name ?? "A client"} requested ${title} for ${input.bookingDate}. Booking ${booking.booking_number}.`,
+    type: "booking_request",
+  }, booking.id);
+  return booking;
+}
+
+async function notifyBookingParticipant(userId: string, notification: { title: string; message: string; type?: string }, bookingId: string) {
   try {
-    const client = await UserRepo.getUserById(i.authenticatedClientId);
-    const clientName = client?.full_name ?? "A client";
     await NotificationRepo.createNotification({
-      user_id: i.photographerId,
-      title: "New Booking Request",
-      message: `${clientName} has requested a photography session: "${i.title.trim()}" on ${i.bookingDate}.`,
-      notification_type: "booking_request",
+      user_id: userId,
+      title: notification.title,
+      message: notification.message.slice(0, 500),
+      notification_type: notification.type ?? "booking_status",
       is_read: false,
       read_at: null,
     });
-  } catch {
-    // Notification failure should not roll back the booking
+  } catch (error) {
+    console.error("[Booking] Notification could not be created for booking", bookingId, error instanceof Error ? error.message : "Unknown error");
   }
-  return booking;
 }
-export async function setBookingStatus(i:{bookingId:string; actorUserId:string; actorRole:"CLIENT"|"PHOTOGRAPHER"|"ADMIN"; status:"ACCEPTED"|"CONFIRMED"|"REJECTED"|"CANCELLED"|"COMPLETED"}) {
- const b=await BookingRepo.getBookingById(i.bookingId); if(!b) throw new BookingServiceError("Booking not found.","NOT_FOUND");
- const client=b.client_id===i.actorUserId, photographer=b.photographer_id===i.actorUserId;
- if(i.actorRole!=="ADMIN"&&!client&&!photographer) throw new BookingServiceError("Forbidden.","FORBIDDEN");
- const transitions:Record<string,string[]>={PENDING:["ACCEPTED","REJECTED","CANCELLED"],ACCEPTED:["CONFIRMED","CANCELLED"],CONFIRMED:["COMPLETED","CANCELLED"]};
- if(!transitions[b.status]?.includes(i.status)) throw new BookingServiceError("Invalid booking status transition.","INVALID_TRANSITION");
- if(["ACCEPTED","REJECTED"].includes(i.status)&&!photographer&&i.actorRole!=="ADMIN") throw new BookingServiceError("Only the photographer can respond.","FORBIDDEN");
- if(i.status==="COMPLETED"&&!photographer&&i.actorRole!=="ADMIN") throw new BookingServiceError("Only photographer/admin can complete a booking.","FORBIDDEN");
- return BookingRepo.updateBooking(b.id,{status:i.status});
+
+export async function setBookingStatus(input: {
+  bookingId: string;
+  actorUserId: string;
+  actorRoles: readonly string[];
+  status: "ACCEPTED" | "CONFIRMED" | "REJECTED" | "CANCELLED" | "COMPLETED";
+}) {
+  const result = await transaction(async (client) => {
+    const booking = await BookingRepo.getBookingForUpdate(client, input.bookingId);
+    if (!booking) throw new BookingServiceError("Booking not found.", "NOT_FOUND");
+
+    const isAdmin = input.actorRoles.includes("ADMIN");
+    const isClient = booking.client_id === input.actorUserId && input.actorRoles.includes("CLIENT");
+    const isPhotographer = booking.photographer_id === input.actorUserId && input.actorRoles.includes("PHOTOGRAPHER");
+    if (!isAdmin && !isClient && !isPhotographer) throw new BookingServiceError("You are not allowed to update this booking.", "FORBIDDEN");
+    if (!VALID_TRANSITIONS[booking.status]?.includes(input.status)) {
+      throw new BookingServiceError("This booking status cannot be changed to that value.", "INVALID_TRANSITION");
+    }
+    if (["ACCEPTED", "REJECTED"].includes(input.status) && !isAdmin && !isPhotographer) {
+      throw new BookingServiceError("Only the photographer can accept or reject a request.", "FORBIDDEN");
+    }
+    if (input.status === "COMPLETED" && !isAdmin && !isPhotographer) {
+      throw new BookingServiceError("Only the photographer can complete a booking.", "FORBIDDEN");
+    }
+    const updated = await BookingRepo.updateBookingStatusInTransaction(client, booking.id, input.status);
+    if (!updated) throw new BookingServiceError("Booking could not be updated.", "UPDATE_FAILED");
+    const recipientIds = input.status === "CANCELLED" || input.status === "CONFIRMED"
+      ? isAdmin
+        ? [booking.client_id, booking.photographer_id]
+        : [booking.client_id === input.actorUserId ? booking.photographer_id : booking.client_id]
+      : [booking.client_id];
+    return { booking: updated, recipientIds };
+  });
+
+  const titleByStatus: Record<string, string> = {
+    ACCEPTED: "Booking request accepted",
+    REJECTED: "Booking request declined",
+    CONFIRMED: "Booking confirmed",
+    CANCELLED: "Booking cancelled",
+    COMPLETED: "Session marked complete",
+  };
+  await Promise.all(result.recipientIds.map((recipientId) => notifyBookingParticipant(recipientId, {
+    title: titleByStatus[input.status],
+    message: `Booking ${result.booking.booking_number} for ${result.booking.title ?? "your session"} is now ${input.status.toLowerCase()}.`,
+  }, result.booking.id)));
+  return result.booking;
 }
-export async function sendBookingMessage(i:{bookingId:string; authenticatedUserId:string; message:string}) { const b=await BookingRepo.getBookingById(i.bookingId); if(!b) throw new BookingServiceError("Booking not found.","NOT_FOUND"); if(![b.client_id,b.photographer_id].includes(i.authenticatedUserId)) throw new BookingServiceError("Forbidden.","FORBIDDEN"); if(!i.message.trim()) throw new BookingServiceError("Message cannot be empty.","EMPTY_MESSAGE"); return MessageRepo.createBookingMessage({booking_id:b.id,sender_user_id:i.authenticatedUserId,message:i.message.trim()}); }
-export const listMessages=(bookingId:string)=>MessageRepo.listMessagesForBooking(bookingId);
-export const listPayments=(bookingId:string)=>PaymentRepo.listPaymentsForBooking(bookingId);
+
+export async function sendBookingMessage(input: { bookingId: string; authenticatedUserId: string; message: string }) {
+  const booking = await BookingRepo.getBookingById(input.bookingId);
+  if (!booking) throw new BookingServiceError("Booking not found.", "NOT_FOUND");
+  if (booking.client_id !== input.authenticatedUserId && booking.photographer_id !== input.authenticatedUserId) {
+    throw new BookingServiceError("You are not allowed to access this conversation.", "FORBIDDEN");
+  }
+  const message = input.message.trim();
+  if (!message) throw new BookingServiceError("Message cannot be empty.", "INVALID_MESSAGE");
+  if (message.length > 2000) throw new BookingServiceError("Messages must be 2,000 characters or less.", "INVALID_MESSAGE");
+  return MessageRepo.createBookingMessage({ booking_id: booking.id, sender_user_id: input.authenticatedUserId, message });
+}
+
+export async function listMessagesForParticipant(bookingId: string, userId: string) {
+  const booking = await BookingRepo.getBookingById(bookingId);
+  if (!booking) throw new BookingServiceError("Booking not found.", "NOT_FOUND");
+  if (booking.client_id !== userId && booking.photographer_id !== userId) {
+    throw new BookingServiceError("You are not allowed to access this conversation.", "FORBIDDEN");
+  }
+  return MessageRepo.listMessagesForBooking(bookingId);
+}
+
+export const listPayments = (bookingId: string) => PaymentRepo.listPaymentsForBooking(bookingId);
 
 export async function listMyBookings(clientId: string, limit = 50, offset = 0) {
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {
-    throw new Error("Invalid pagination.");
-  }
-  return BookingRepo.listBookingsForClient(clientId, limit, offset);
+  validatePagination(limit, offset);
+  return BookingRepo.listBookingsForClientWithPhotographer(clientId, limit, offset);
 }
 
 export async function listPhotographerBookings(photographerId: string, limit = 50, offset = 0) {
+  validatePagination(limit, offset);
+  return BookingRepo.listBookingsForPhotographerWithClient(photographerId, limit, offset);
+}
+
+export async function listAdminBookings(limit = 50, offset = 0) {
+  validatePagination(limit, offset);
+  return BookingRepo.listBookings(limit, offset);
+}
+
+function validatePagination(limit: number, offset: number) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {
     throw new Error("Invalid pagination.");
   }
-  return BookingRepo.listBookingsForPhotographer(photographerId, limit, offset);
 }
 
-export async function getMyBooking(bookingId: string, clientId: string) {
-  const b = await BookingRepo.getBookingById(bookingId);
-  if (!b) return null;
-  if (b.client_id !== clientId) return null;
-  return b;
+async function getClientProfileSummary(clientId: string) {
+  const [user, clientProfile] = await Promise.all([
+    UserRepo.getUserById(clientId),
+    ClientProfileRepo.getClientProfileByUserId(clientId),
+  ]);
+  if (!user || !user.is_active || user.deleted_at) return null;
+  return {
+    id: user.id,
+    full_name: user.full_name,
+    avatar_url: user.avatar_url,
+    email: user.email,
+    phone: user.phone,
+    organization_name: clientProfile?.organization_name ?? null,
+    created_at: user.created_at,
+  };
+}
+
+export async function getBookingForParticipant(bookingId: string, userId: string, isAdmin = false) {
+  const booking = await BookingRepo.getBookingById(bookingId);
+  if (!booking || (!isAdmin && booking.client_id !== userId && booking.photographer_id !== userId)) return null;
+  if (booking.photographer_id === userId) {
+    return { ...booking, client_profile: await getClientProfileSummary(booking.client_id) };
+  }
+  if (booking.client_id === userId) {
+    return { ...booking, photographer_profile: await getPhotographerProfileSummary(booking.photographer_id) };
+  }
+  if (isAdmin) {
+    const [client_profile, photographer_profile] = await Promise.all([
+      getClientProfileSummary(booking.client_id),
+      getPhotographerProfileSummary(booking.photographer_id),
+    ]);
+    return { ...booking, client_profile, photographer_profile };
+  }
+  return booking;
+}
+
+async function getPhotographerProfileSummary(userId: string) {
+  const [profile, user] = await Promise.all([
+    PhotographerProfileRepo.getPhotographerProfileByUserId(userId),
+    UserRepo.getUserById(userId),
+  ]);
+  if (!profile || !user || !user.is_active || user.deleted_at) return null;
+  return {
+    id: profile.id,
+    user_id: profile.user_id,
+    full_name: user.full_name,
+    avatar_url: user.avatar_url,
+    title: profile.title,
+    location: profile.location,
+    photography_genre: profile.photography_genre,
+  };
 }

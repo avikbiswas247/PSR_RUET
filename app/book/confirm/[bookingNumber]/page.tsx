@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, use } from "react";
 import { PublicBooking } from "@/lib/types/public";
+import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 
 export default function BookingConfirmPage({
   params,
@@ -17,10 +18,11 @@ export default function BookingConfirmPage({
   useEffect(() => {
     const fetchBooking = async () => {
       try {
-        const res = await fetch("/api/bookings");
+        const res = await fetch("/api/bookings?limit=100", { cache: "no-store" });
         if (!res.ok) throw new Error("Unable to load bookings.");
-        const data = await res.json();
-        const bookings = Array.isArray(data) ? data : [data];
+        const payload = await res.json();
+        const data = payload?.data ?? payload;
+        const bookings = Array.isArray(data) ? data : data ? [data] : [];
         const match = bookings.find((b) => b.booking_number === bookingNumber);
         setBooking(match ?? null);
         if (!match) setError("Booking reference not found.");
@@ -58,15 +60,6 @@ export default function BookingConfirmPage({
   }
 
   const b = booking;
-  const statusColor = {
-    PENDING: "text-orange border-orange/20 bg-orange/5",
-    ACCEPTED: "text-orange border-orange/20 bg-orange/5",
-    CONFIRMED: "text-orange border-orange/20 bg-orange/5",
-    REJECTED: "text-orange-deep border-orange-deep/20 bg-orange-deep/5",
-    CANCELLED: "text-muted border-line-border bg-transparent",
-    COMPLETED: "text-muted border-line-border bg-transparent",
-  }[b.status] || "text-muted border-line-border bg-transparent";
-
   return (
     <div className="section-pad max-w-[720px] mx-auto">
       <div className="flex items-center justify-between mb-10">
@@ -80,8 +73,8 @@ export default function BookingConfirmPage({
           <span className="text-2xl">&#127926;</span>
         </div>
         <h1 className="text-[32px] tracking-tight font-bold mb-4">Booking Request Sent</h1>
-        <p className="text-lg text-gray-400 mb-8">
-          Your session request has been submitted. The photographer will review and respond to your request.
+        <p className="text-lg text-muted mb-8">
+          Your request is saved. The photographer will review it and respond before the session is confirmed.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
@@ -91,9 +84,7 @@ export default function BookingConfirmPage({
           </div>
           <div className="p-4 rounded-sm border line-border bg-surface-2 text-left">
             <p className="text-xs font-bold tracking-wider uppercase text-muted mb-1">Status</p>
-            <span className={`text-xs font-bold tracking-wider border rounded px-3 py-1 ${statusColor}`}>
-              {b.status}
-            </span>
+            <BookingStatusBadge status={b.status} />
           </div>
         </div>
 
@@ -101,11 +92,13 @@ export default function BookingConfirmPage({
           <h3 className="text-sm font-bold text-white mb-4">Session Details</h3>
           <div className="space-y-3 text-sm text-gray-400">
             <p><span className="font-bold">Booking ID:</span> {b.id}</p>
-            <p><span className="font-bold">Date:</span> {new Date(b.booking_date).toLocaleDateString()}</p>
-            <p><span className="font-bold">Time:</span> {String(b.start_time)} &ndash; {String(b.end_time)}</p>
+            {b.photographer_profile?.full_name && <p><span className="font-bold">Photographer:</span> {b.photographer_profile.full_name}</p>}
+            <p><span className="font-bold">Session:</span> {b.title || "Photography session"}</p>
+            <p><span className="font-bold">Service:</span> {b.photography_type || "Not specified"}</p>
+            <p><span className="font-bold">Date:</span> {new Date(`${String(b.booking_date).slice(0, 10)}T00:00:00`).toLocaleDateString()}</p>
+            <p><span className="font-bold">Time:</span> {String(b.start_time).slice(0, 5)} &ndash; {String(b.end_time).slice(0, 5)}</p>
             <p><span className="font-bold">Location:</span> {b.location || "TBD"}</p>
-            <p><span className="font-bold">Session Type:</span> {b.photography_type || "Not specified"}</p>
-            {b.budget && <p><span className="font-bold">Budget:</span> BDT {b.budget}</p>}
+            {b.budget != null && <p><span className="font-bold">Proposed budget:</span> BDT {Number(b.budget).toLocaleString()}</p>}
             {b.description && <p><span className="font-bold">Details:</span> {b.description}</p>}
           </div>
         </div>
@@ -118,10 +111,10 @@ export default function BookingConfirmPage({
             View My Bookings
           </Link>
           <Link
-            href="/book"
+            href={b.photographer_profile?.id ? `/photographers/${b.photographer_profile.id}` : "/photographers"}
             className="button button-outline w-full py-3"
           >
-            Browse More Photographers
+            Return to Photographer Profile
           </Link>
         </div>
       </div>

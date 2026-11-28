@@ -14,6 +14,7 @@ export async function GET(request: Request) {
       genre: url.searchParams.get("genre") || undefined,
       device: url.searchParams.get("device") || undefined,
       location: url.searchParams.get("location") || undefined,
+      availableOnly: url.searchParams.get("availableOnly") === "true",
     });
     const filtered = photographers.filter((p) =>
       (p.roles ?? []).some((role) => ALLOWED_ROLES.has(role))

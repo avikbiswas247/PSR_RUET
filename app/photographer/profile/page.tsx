@@ -12,11 +12,12 @@ import { PhotographerProfileMe } from "@/lib/types/public";
 type Photo = { id: string; title: string | null; image_url: string; thumbnail_url: string | null };
 
 export default function PhotographerProfilePage() {
+  const [photosVersion, setPhotosVersion] = useState(0);
   const { data, loading } = useApi<PhotographerProfileMe | null>(
     "/api/photographers/me"
   );
   const { data: photosData, loading: photosLoading } =
-    useApi<Photo[] | null>("/api/photos");
+    useApi<Photo[] | null>(`/api/photos?refresh=${photosVersion}`);
   const [profile, setProfile] = useState<PhotographerProfileMe | null>(() => data ?? null);
   const [busy, setBusy] = useState(false);
   const [dpBusy, setDpBusy] = useState(false);
@@ -178,14 +179,16 @@ export default function PhotographerProfilePage() {
         body: JSON.stringify({ title: newPhotoTitle || "Untitled", imageUrl }),
       });
       const pjson = await pres.json().catch(() => ({}));
-      if (!pres.ok) throw new Error(pjson.message || "Unable to publish photo.");
+      if (!pres.ok) throw new Error(pjson.error?.message || pjson.message || "Unable to publish photo.");
       setNotice("Photo uploaded to your grid.");
       setNewPhotoTitle("");
-      e.target.value = "";
+      setPhotosVersion((version) => version + 1);
+      window.dispatchEvent(new Event("photos:updated"));
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Photo upload failed.");
     } finally {
       setPhotoBusy(false);
+      e.target.value = "";
     }
   };
 
@@ -478,11 +481,14 @@ export default function PhotographerProfilePage() {
 
       {/* Photo upload (always available at bottom of grid) */}
       <div className="mt-6 p-4 rounded-lg border line-border bg-surface">
-        <label className="block text-xs font-bold text-muted mb-3">Upload a new photo to your grid</label>
+        <label htmlFor="profile-photo-file" className="block text-xs font-bold text-muted mb-3">Upload a new photo to your grid</label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <input
+            id="profile-photo-file"
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+            aria-label="Choose a photo to upload"
+            disabled={photoBusy}
             onChange={handlePhotoUpload}
             className="block w-full text-xs text-muted file:mr-2 file:py-2 file:px-4 file:rounded file:border file:border-line-border file:text-orange hover:file:bg-orange/10 cursor-pointer"
           />

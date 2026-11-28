@@ -1,4 +1,4 @@
-import { byId, deleteById, insertRow, many, updateRow } from "./_shared";
+import { byId, deleteById, insertRow, many, one, updateRow } from "./_shared";
 
 export interface ClientProfile {
   id: string;
@@ -15,6 +15,10 @@ const UPDATE_COLUMNS = ["organization_name", "billing_address"] as const;
 
 export function getClientProfileById(id: string) {
   return byId<ClientProfile>(TABLE, id);
+}
+
+export function getClientProfileByUserId(userId: string) {
+  return one<ClientProfile>(`SELECT * FROM ${TABLE} WHERE user_id = $1 LIMIT 1`, [userId]);
 }
 
 export function listClientProfiles(limit = 50, offset = 0) {

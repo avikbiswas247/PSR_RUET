@@ -9,7 +9,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 export default function BookPage() {
   const { user } = useAuth();
   const { data, loading, error } = useApi<PublicPhotographer[] | null>(
-    "/api/photographers"
+    "/api/photographers?availableOnly=true&limit=100"
   );
 
   const photographers = loading ? [] : (data ?? []);
@@ -42,7 +42,7 @@ export default function BookPage() {
     );
   }
 
-  const canBook = !!user && !user.roles?.includes("PHOTOGRAPHER");
+  const canBook = !!user?.roles?.includes("CLIENT");
 
   return (
     <div className="section-pad max-w-[1200px] mx-auto">
@@ -64,6 +64,7 @@ export default function BookPage() {
             initialPhotographers={photographers}
             initialLoading={loading}
             showBookButton={canBook}
+            availableOnly
           />
         </div>
 

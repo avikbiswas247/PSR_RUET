@@ -9,7 +9,8 @@ import { useApi } from "@/lib/hooks/use-api";
 import { PublicPhoto } from "@/lib/types/public";
 
 export default function PhotographerPhotosPage() {
-  const { data, loading, error } = useApi<PublicPhoto[] | null>("/api/photos");
+  const [photosVersion, setPhotosVersion] = useState(0);
+  const { data, loading, error } = useApi<PublicPhoto[] | null>(`/api/photos?refresh=${photosVersion}`);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadNotice, setUploadNotice] = useState("");
   const [title, setTitle] = useState("");
@@ -77,13 +78,14 @@ export default function PhotographerPhotosPage() {
         body: JSON.stringify({ title: title || "Untitled", description, imageUrl }),
       });
       const pjson = await pres.json().catch(() => ({}));
-      if (!pres.ok) throw new Error(pjson.message || "Unable to publish photo.");
+      if (!pres.ok) throw new Error(pjson.error?.message || pjson.message || "Unable to publish photo.");
 
       setUploadNotice("Photo uploaded and published.");
       setTitle("");
       setDescription("");
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      setPhotosVersion((version) => version + 1);
       window.dispatchEvent(new Event("photos:updated"));
     } catch (err) {
       setUploadNotice(err instanceof Error ? err.message : "Please try again.");
@@ -100,7 +102,11 @@ export default function PhotographerPhotosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: editTitle || null, description: editDesc || null }),
       });
-      if (!res.ok) throw new Error("Unable to update caption.");
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error?.message || payload.message || "Unable to update caption.");
+      }
+      setPhotosVersion((version) => version + 1);
       setEditPhotoId(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Unable to update caption.");
@@ -118,7 +124,11 @@ export default function PhotographerPhotosPage() {
     setDeleteBusy((prev) => new Set([...prev, photoId]));
     try {
       const res = await fetch(`/api/photos/${photoId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Unable to delete photo.");
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error?.message || payload.message || "Unable to delete photo.");
+      }
+      setPhotosVersion((version) => version + 1);
       window.dispatchEvent(new Event("photos:updated"));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Unable to delete photo.");
@@ -153,7 +163,7 @@ export default function PhotographerPhotosPage() {
             the Portfolios section.
           </p>
         </div>
-        <Button onClick={() => fileInputRef.current?.click()} variant="outline">
+        <Button onClick={() => fileInputRef.current?.click()} variant="outline" disabled={uploadBusy}>
           Upload photo
         </Button>
       </div>
@@ -178,7 +188,8 @@ export default function PhotographerPhotosPage() {
               placeholder="Description"
             />
           </div>
-          <label htmlFor="file-input" className="relative border-2 border-dashed border-line-border rounded-lg p-6 flex flex-col items-center justify-center hover:border-orange/50 transition-colors cursor-pointer focus-within:border-orange/70">
+          <div className="rounded-lg border-2 border-dashed border-line-border p-5 transition-colors hover:border-orange/50 focus-within:border-orange/70">
+            <label htmlFor="file-input" className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted">Photo file</label>
             <span className="text-orange font-bold text-sm mb-2">📷 Choose image</span>
             <span className="text-xs text-muted">{selectedFile ? selectedFile.name : "JPEG, PNG, WebP up to 10 MB"}</span>
             <input
@@ -186,13 +197,14 @@ export default function PhotographerPhotosPage() {
               id="file-input"
               type="file"
               name="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
               required
               disabled={uploadBusy}
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              className="block w-full cursor-pointer text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-sm file:border file:border-line-border file:bg-surface-2 file:px-4 file:py-2 file:font-semibold file:text-orange hover:file:border-orange"
             />
-          </label>
+            <p className="mt-2 text-xs text-muted">{selectedFile ? `Selected: ${selectedFile.name}` : "Choose a JPEG, PNG, WebP, GIF, or AVIF image up to 10 MB."}</p>
+          </div>
           {uploadNotice && (
             <div className="p-3 rounded-lg bg-orange/10 border border-orange/20 text-orange text-sm">
               {uploadNotice}

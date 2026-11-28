@@ -14,6 +14,7 @@ interface PhotographerSearchGridProps {
   initialLoading?: boolean;
   className?: string;
   showBookButton?: boolean;
+  availableOnly?: boolean;
 }
 
 export function PhotographerSearchGrid({
@@ -21,6 +22,7 @@ export function PhotographerSearchGrid({
   initialLoading = false,
   className,
   showBookButton = true,
+  availableOnly = false,
 }: PhotographerSearchGridProps) {
   const [search, setSearch] = useState("");
   const [genre, setGenre] = useState("");
@@ -37,7 +39,7 @@ export function PhotographerSearchGrid({
     return () => clearTimeout(timeout);
   }, [search]);
 
-  const query = `/api/photographers?search=${encodeURIComponent(
+  const query = `/api/photographers?limit=100&availableOnly=${availableOnly}&search=${encodeURIComponent(
     debouncedSearch
   )}&genre=${encodeURIComponent(genre)}&device=${encodeURIComponent(
     device
@@ -199,7 +201,7 @@ export function PhotographerSearchGrid({
                     full_name={photographer.full_name}
                     title={photographer.title}
                     location={photographer.location}
-                    is_available={photographer.is_available}
+                    is_available={availableOnly || photographer.is_available}
                     roles={photographer.roles}
                     avatar_url={photographer.avatar_url}
                     device={photographer.device}

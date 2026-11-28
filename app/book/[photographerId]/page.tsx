@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { FormEvent, useMemo, useRef, useState, use } from "react";
+import { FormEvent, useMemo, useRef, useState, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/lib/hooks/use-api";
 import { PublicPhotographer } from "@/lib/types/public";
+import { PHOTOGRAPHY_SERVICES } from "@/lib/constants/booking";
 
 interface AvailabilitySlot {
   id: string;
@@ -35,6 +36,10 @@ function localDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function isoDate(value: string | Date) {
+  return String(value).slice(0, 10);
+}
+
 export default function BookPhotographerPage({
   params,
 }: {
@@ -50,27 +55,59 @@ export default function BookPhotographerPage({
     end.setDate(end.getDate() + 90);
     return localDateString(end);
   });
+  const [availabilityVersion, setAvailabilityVersion] = useState(0);
 
   const { data: photographer, loading: photoLoading, error: photoError } =
     useApi<PublicPhotographer | null>(`/api/photographers/${photographerId}`);
   const availabilityUrl = photographer?.user_id
     ? `/api/availability?photographerId=${photographer.user_id}&from=${fromDate}&to=${toDate}`
     : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
+  const refreshedAvailabilityUrl = `${availabilityUrl}&refresh=${availabilityVersion}`;
   const { data: slotsData, loading: slotsLoading, error: slotsError } = useApi<
     AvailabilitySlot[] | null
-  >(availabilityUrl);
+  >(refreshedAvailabilityUrl);
 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [authRequired, setAuthRequired] = useState(false);
   const [noticeType, setNoticeType] = useState<"error" | "success">("error");
+  const [reviewing, setReviewing] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => localDateString(new Date()).slice(0, 7));
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     location: "",
+    photographyType: "",
+    budget: "",
   });
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(`psr-booking-draft:${photographerId}`);
+    let active = true;
+    window.setTimeout(() => {
+      if (!active) return;
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved) as { formData?: typeof formData; selectedSlot?: AvailabilitySlot | null; selectedDate?: string | null };
+          if (draft.formData) setFormData((current) => ({ ...current, ...draft.formData }));
+          if (draft.selectedSlot) setSelectedSlot(draft.selectedSlot);
+          if (draft.selectedDate) setSelectedDate(draft.selectedDate);
+        } catch {
+          sessionStorage.removeItem(`psr-booking-draft:${photographerId}`);
+        }
+      }
+      setDraftReady(true);
+    }, 0);
+    return () => { active = false; };
+  }, [photographerId]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    sessionStorage.setItem(`psr-booking-draft:${photographerId}`, JSON.stringify({ formData, selectedSlot, selectedDate }));
+  }, [draftReady, photographerId, formData, selectedSlot, selectedDate]);
 
   const allSlots = useMemo(() => slotsLoading ? [] : (slotsData ?? []), [slotsData, slotsLoading]);
   const availableSlots = useMemo(
@@ -78,11 +115,11 @@ export default function BookPhotographerPage({
     [allSlots]
   );
   const slotsForSelectedDate = useMemo(
-    () => (selectedDate ? allSlots.filter((s) => s.available_date === selectedDate && s.is_available) : []),
+    () => (selectedDate ? allSlots.filter((s) => isoDate(s.available_date) === selectedDate) : []),
     [allSlots, selectedDate]
   );
 
-  const hasAvailability = availableSlots.length > 0;
+  const hasAvailability = photographer?.is_available !== false && availableSlots.length > 0;
 
   const { year, month } = useMemo(() => {
     const [y, m] = calendarMonth.split("-").map(Number);
@@ -92,11 +129,13 @@ export default function BookPhotographerPage({
   const daysInMonth = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
   const firstDayOfMonth = useMemo(() => new Date(year, month - 1, 1).getDay(), [year, month]);
   const todayIso = localDateString(new Date());
+  const maxBookableDate = toDate;
+  const lastBookableMonth = maxBookableDate.slice(0, 7);
 
   const availableDatesSet = useMemo(() => {
     const set = new Set<string>();
     for (const s of allSlots) {
-      if (s.is_available) set.add(s.available_date);
+      if (s.is_available) set.add(isoDate(s.available_date));
     }
     return set;
   }, [allSlots]);
@@ -108,7 +147,7 @@ export default function BookPhotographerPage({
     }
     for (let d = 1; d <= daysInMonth; d++) {
       const iso = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      const isPast = iso < todayIso;
+      const isPast = iso < todayIso || iso > maxBookableDate;
       const hasAvailability = availableDatesSet.has(iso);
       dates.push({
         date: d,
@@ -117,11 +156,11 @@ export default function BookPhotographerPage({
         isSelected: selectedDate === iso,
         hasAvailability,
         isToday: iso === todayIso,
-        availableSlots: allSlots.filter((s) => s.available_date === iso),
+        availableSlots: allSlots.filter((s) => isoDate(s.available_date) === iso),
       });
     }
     return dates;
-  }, [year, month, daysInMonth, firstDayOfMonth, todayIso, availableDatesSet, allSlots, selectedDate]);
+  }, [year, month, daysInMonth, firstDayOfMonth, todayIso, maxBookableDate, availableDatesSet, allSlots, selectedDate]);
 
   const prevMonth = () => {
     const [y, m] = calendarMonth.split("-").map(Number);
@@ -155,7 +194,7 @@ export default function BookPhotographerPage({
   };
 
   const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -163,11 +202,27 @@ export default function BookPhotographerPage({
     });
   };
 
-  const submitBooking = async (e: FormEvent<HTMLFormElement>) => {
+  const reviewBooking = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!selectedSlot || !formData.title.trim() || !formData.description.trim() || !formData.photographyType) {
+      setNotice("Choose a slot, session title, service, and booking message before reviewing.");
+      setNoticeType("error");
+      return;
+    }
+    if (formData.budget && (!Number.isFinite(Number(formData.budget)) || Number(formData.budget) < 0)) {
+      setNotice("Enter a valid non-negative budget in BDT.");
+      setNoticeType("error");
+      return;
+    }
+    setNotice("");
+    setReviewing(true);
+  };
+
+  const confirmBooking = async () => {
     if (submitRef.current) return;
     submitRef.current = true;
     setBusy(true);
+    setAuthRequired(false);
     setNotice("");
     if (!selectedSlot) {
       setNotice("Please select a time slot.");
@@ -177,26 +232,39 @@ export default function BookPhotographerPage({
       return;
     }
     try {
-      const generatedBookingNumber = `PSR-${Date.now().toString(36).toUpperCase()}`;
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          photographerId: photographer?.user_id ?? photographerId,
-          bookingNumber: generatedBookingNumber,
-          title: formData.title || "Photography Session",
-          description: formData.description || undefined,
-          photographyType: "portrait",
-          location: formData.location || "",
-          bookingDate: selectedSlot.available_date,
+          // The service accepts either profile ID or photographer user ID and
+          // resolves it against the active photographer profile on the server.
+          photographerId,
+          title: formData.title,
+          description: formData.description,
+          photographyType: formData.photographyType,
+          location: formData.location || null,
+          bookingDate: isoDate(selectedSlot.available_date),
           startTime: selectedSlot.start_time,
           endTime: selectedSlot.end_time,
-          budget: undefined,
+          budget: formData.budget ? Number(formData.budget) : null,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message || json.error?.message || "Booking failed.");
-      router.push(`/book/confirm/${generatedBookingNumber}`);
+      if (!res.ok) {
+        if (res.status === 401) setAuthRequired(true);
+        if (res.status === 409) {
+          setAvailabilityVersion((version) => version + 1);
+          setSelectedSlot(null);
+          setReviewing(false);
+        }
+        throw new Error(json.error?.message || json.message || "Booking failed.");
+      }
+      const bookingNumber = json.data?.booking_number;
+      if (!bookingNumber) throw new Error("The booking was saved but no confirmation number was returned. Please check My Bookings.");
+      await fetch(availabilityUrl, { cache: "no-store" }).catch(() => null);
+      sessionStorage.removeItem(`psr-booking-draft:${photographerId}`);
+      setAvailabilityVersion((version) => version + 1);
+      router.push(`/book/confirm/${bookingNumber}`);
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Unable to book session.");
       setNoticeType("error");
@@ -205,7 +273,7 @@ export default function BookPhotographerPage({
     }
   };
 
-  const canBook = !!selectedSlot && !!formData.title && !!formData.location && !busy;
+  const canBook = !!selectedSlot && !!formData.title.trim() && !!formData.description.trim() && !!formData.photographyType && !busy;
 
   // Loading state
   if (photoLoading || slotsLoading) {
@@ -313,7 +381,7 @@ export default function BookPhotographerPage({
               Choose a date and time, then confirm your booking request.
             </p>
           </div>
-          <Link href={`/photographers/${photographerId}`} className="text-xs font-bold text-orange hover:underline inline-flex items-center gap-1">
+        <Link href={`/photographers/${photographerId}`} className="text-xs font-bold text-orange hover:underline inline-flex items-center gap-1">
             &#8592; View profile
           </Link>
         </div>
@@ -409,7 +477,7 @@ export default function BookPhotographerPage({
                 <div className="flex gap-2">
                   <button
                     onClick={prevMonth}
-                    disabled={calendarMonth === new Date().toISOString().slice(0, 7)}
+                    disabled={calendarMonth === localDateString(new Date()).slice(0, 7)}
                     className="p-2 rounded-[8px] border border-[rgba(255,255,255,0.13)] bg-transparent text-muted hover:text-white hover:border-orange disabled:opacity-40 disabled:pointer-events-none transition-all"
                     aria-label="Previous month"
                   >
@@ -420,7 +488,8 @@ export default function BookPhotographerPage({
                   </span>
                   <button
                     onClick={nextMonth}
-                    className="p-2 rounded-[8px] border border-[rgba(255,255,255,0.13)] bg-transparent text-muted hover:text-white hover:border-orange transition-all"
+                    disabled={calendarMonth >= lastBookableMonth}
+                    className="p-2 rounded-[8px] border border-[rgba(255,255,255,0.13)] bg-transparent text-muted hover:text-white hover:border-orange disabled:opacity-40 disabled:pointer-events-none transition-all"
                     aria-label="Next month"
                   >
                     &#8594;
@@ -443,7 +512,7 @@ export default function BookPhotographerPage({
                       key={`${d.iso}`}
                       onClick={() => selectDate(d.iso)}
                       disabled={d.isPast || !d.hasAvailability}
-                      className={`h-12 w-12 rounded-[8px] flex flex-col items-center justify-center text-xs transition-all ${
+                      className={`h-10 w-full min-w-0 rounded-[8px] flex flex-col items-center justify-center text-xs transition-all sm:h-12 ${
                         d.isSelected
                           ? "bg-orange text-[#14110f] font-bold"
                           : d.isPast || !d.hasAvailability
@@ -542,13 +611,33 @@ export default function BookPhotographerPage({
             {/* Booking form */}
             <div className="p-8 rounded-[14px] border border-[rgba(255,255,255,0.13)] bg-[#111110]">
               <h2 className="text-[18px] font-bold text-white mb-6">Booking Details</h2>
-              <form onSubmit={submitBooking} className="space-y-5">
+              <form onSubmit={reviewBooking} className="space-y-5">
+                {!reviewing ? <>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
+                  <label htmlFor="photographyType" className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
+                    Photography service
+                  </label>
+                  <select
+                    id="photographyType"
+                    name="photographyType"
+                    required
+                    value={formData.photographyType}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, photographyType: e.target.value }))}
+                    className="w-full px-4 py-3 text-text border line-border rounded-sm bg-surface focus:border-orange focus:ring-1 focus:ring-orange/25 outline-none"
+                  >
+                    <option value="">Select a service</option>
+                    {PHOTOGRAPHY_SERVICES.map((service) => <option key={service} value={service}>{service}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="sessionTitle" className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
                     Session Title
                   </label>
                   <Input
+                    id="sessionTitle"
                     name="title"
+                    required
+                    maxLength={120}
                     value={formData.title}
                     onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                     placeholder="e.g. Portrait Session"
@@ -556,11 +645,13 @@ export default function BookPhotographerPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
-                    Location
+                  <label htmlFor="sessionLocation" className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
+                    Session location <span className="normal-case tracking-normal">(optional)</span>
                   </label>
                   <Input
+                    id="sessionLocation"
                     name="location"
+                    maxLength={240}
                     value={formData.location}
                     onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
                     placeholder="Where should we meet?"
@@ -568,17 +659,43 @@ export default function BookPhotographerPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
-                    Message to Photographer
+                  <label htmlFor="bookingMessage" className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
+                    Message to photographer <span aria-hidden="true">*</span>
                   </label>
                   <Textarea
+                    id="bookingMessage"
                     name="description"
+                    required
+                    maxLength={2000}
                     value={formData.description}
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="What kind of photoshoot do you want?"
+                    placeholder="Share what you need, the occasion, and any important details."
                     rows={3}
                     className="mb-0"
                   />
+                  <p className="mt-1 text-right text-[10px] text-muted">{formData.description.length}/2,000</p>
+                </div>
+                <div>
+                  <label htmlFor="proposedBudget" className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
+                    Proposed budget <span className="normal-case tracking-normal">(optional, BDT)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted text-sm">৳</span>
+                    <Input
+                      id="proposedBudget"
+                      name="budget"
+                      type="number"
+                      min="0"
+                      max="1000000000"
+                      step="1"
+                      inputMode="decimal"
+                      value={formData.budget}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, budget: e.target.value }))}
+                      placeholder="Your proposed amount"
+                      className="mb-0 pl-9"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-muted">This is your proposed budget, not a confirmed quotation.</p>
                 </div>
                 <div className="pt-4 border-t border-[rgba(255,255,255,0.13)]">
                   <div className="flex items-start gap-3 mb-3">
@@ -606,12 +723,41 @@ export default function BookPhotographerPage({
                     className="w-full py-4 text-lg font-bold tracking-wider"
                     disabled={!canBook}
                   >
-                    {busy ? "Sending Request…" : "Send Booking Request"}
+                    Review booking
                   </Button>
                   <p className="text-[10px] text-muted mt-2 text-center">
-                    Your booking request will be reviewed by the photographer.
+                    The photographer must accept your request before it is confirmed.
                   </p>
                 </div>
+                </> : (
+                  <div className="space-y-5" aria-live="polite">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-orange">Review your request</p>
+                      <h3 className="mt-1 text-xl font-bold">{formData.title}</h3>
+                      <p className="text-sm text-muted">{photographer.full_name} · {photographer.photography_genre || "Photographer"}</p>
+                    </div>
+                    <dl className="grid grid-cols-1 gap-3 rounded-sm border line-border bg-surface-2 p-4 text-sm sm:grid-cols-2">
+                      <div><dt className="text-xs uppercase tracking-wider text-muted">Service</dt><dd className="mt-1 font-medium">{formData.photographyType}</dd></div>
+                      <div><dt className="text-xs uppercase tracking-wider text-muted">Date</dt><dd className="mt-1 font-medium">{selectedSlot ? formatDate(selectedSlot.available_date) : "Choose a slot"}</dd></div>
+                      <div><dt className="text-xs uppercase tracking-wider text-muted">Time</dt><dd className="mt-1 font-medium">{selectedSlot ? `${formatTime(selectedSlot.start_time)} – ${formatTime(selectedSlot.end_time)}` : "Choose a slot"}</dd></div>
+                      <div><dt className="text-xs uppercase tracking-wider text-muted">Location</dt><dd className="mt-1 font-medium">{formData.location || "To be arranged"}</dd></div>
+                      <div><dt className="text-xs uppercase tracking-wider text-muted">Proposed budget</dt><dd className="mt-1 font-medium">{formData.budget ? `BDT ${Number(formData.budget).toLocaleString()}` : "Not specified"}</dd></div>
+                      <div className="sm:col-span-2"><dt className="text-xs uppercase tracking-wider text-muted">Message</dt><dd className="mt-1 whitespace-pre-wrap font-medium">{formData.description}</dd></div>
+                    </dl>
+                    <p className="text-xs text-muted">Sending this request does not mean the photographer has accepted it. Your booking remains pending until they respond.</p>
+                    {authRequired && <p className="rounded-sm border border-orange/30 bg-orange/5 p-3 text-sm text-orange">Sign in with a client account to send this request. Your booking details are saved on this device.</p>}
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Button type="button" variant="outline" className="flex-1" onClick={() => setReviewing(false)}>Edit booking</Button>
+                      {authRequired ? (
+                        <Link className="button button-primary flex-1 text-center" href={`/sign-in?next=${encodeURIComponent(`/book/${photographerId}`)}`}>Sign in to continue</Link>
+                      ) : (
+                        <Button type="button" variant="primary" className="flex-1" onClick={confirmBooking} disabled={busy || !selectedSlot}>
+                          {busy ? "Sending request…" : "Send Booking Request"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
           </div>

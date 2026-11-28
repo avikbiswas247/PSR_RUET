@@ -104,6 +104,24 @@ export interface PublicBooking {
   end_time: string | Date;
   budget: string | number | null;
   status: string;
+  photographer_profile?: {
+    id: string;
+    user_id: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+    title: string | null;
+    location: string | null;
+    photography_genre: string | null;
+  } | null;
+  client_profile?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+    email: string;
+    phone: string | null;
+    organization_name: string | null;
+    created_at: string | Date;
+  } | null;
   created_at: string | Date;
   updated_at: string | Date;
 }

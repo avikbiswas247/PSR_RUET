@@ -30,13 +30,14 @@ export type PublicPhotographer = {
   is_following: boolean;
 };
 
-export async function listPublicPhotographers(input: { limit?: number; offset?: number; search?: string | null; genre?: string | null; device?: string | null; location?: string | null } = {}) {
+export async function listPublicPhotographers(input: { limit?: number; offset?: number; search?: string | null; genre?: string | null; device?: string | null; location?: string | null; availableOnly?: boolean } = {}) {
   const p = page(input.limit, input.offset);
   const profiles = await PhotographerProfileRepo.listPhotographerProfiles(p.limit, p.offset, {
     search: input.search ?? null,
     genre: input.genre ?? null,
     device: input.device ?? null,
     location: input.location ?? null,
+    availableOnly: input.availableOnly ?? false,
   });
   const result: PublicPhotographer[] = [];
   for (const profile of profiles) {

@@ -9,6 +9,11 @@ import { Input } from "@/components/ui/input";
 import { getRoleHomePath } from "@/lib/auth/role-home";
 import { BrandLogo } from "@/components/layout/brand-logo";
 
+function requestedDestination() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : null;
+}
+
 export default function SignInPage() {
   const { signIn, signUp, user, loading } = useAuth();
   const router = useRouter();
@@ -17,7 +22,7 @@ export default function SignInPage() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!loading && user) router.replace(getRoleHomePath(user.roles));
+    if (!loading && user) router.replace(requestedDestination() ?? getRoleHomePath(user.roles));
   }, [loading, router, user]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -34,7 +39,7 @@ export default function SignInPage() {
         router.push(`/verify-email?userId=${encodeURIComponent(result.userId)}&email=${encodeURIComponent(result.email)}&sent=${result.verificationEmailSent ? "1" : "0"}`);
       } else {
         const user = await signIn(email, password);
-        if (user) router.push(getRoleHomePath(user.roles));
+        if (user) router.push(requestedDestination() ?? getRoleHomePath(user.roles));
       }
     } catch (err) {
       if (err instanceof AuthFlowError && err.code === "EMAIL_NOT_VERIFIED" && err.userId) {

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -8,8 +8,18 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const geistSans = localFont({
+  src: "../public/fonts/geist-latin.woff2",
+  variable: "--font-geist-sans",
+  weight: "400 600",
+  display: "swap",
+});
+const geistMono = localFont({
+  src: "../public/fonts/geist-mono-latin.woff2",
+  variable: "--font-geist-mono",
+  weight: "400 600",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "PSR — See Beyond the Obvious",

@@ -14,16 +14,8 @@ interface AvailabilitySlot {
   start_time: string | Date;
   end_time: string | Date;
   is_available: boolean;
+  is_booked?: boolean;
 }
-
-function toLocalDate(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-const today = toLocalDate(new Date());
-const plus90Date = new Date();
-plus90Date.setDate(plus90Date.getDate() + 90);
-const plus90 = toLocalDate(plus90Date);
 
 export default function PhotographerAvailabilityPage() {
   const { data: profile, loading: profileLoading } = useApi<PhotographerProfileMe | null>(
@@ -31,8 +23,8 @@ export default function PhotographerAvailabilityPage() {
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const url = profile?.user_id
-    ? `/api/availability?photographerId=${profile.user_id}&from=${today}&to=${plus90}&refresh=${refreshKey}`
-    : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
+    ? `/api/availability?photographerId=${profile.user_id}&from=0001-01-01&to=9999-12-31&refresh=${refreshKey}`
+    : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=0001-01-01&to=9999-12-31";
   const { data: slots, loading: slotsLoading, error } = useApi<
     AvailabilitySlot[] | null
   >(url);
@@ -47,7 +39,7 @@ export default function PhotographerAvailabilityPage() {
   const photographerId = profile?.user_id;
   const slotsList = slotsLoading
     ? []
-    : Array.from(new Map<string, AvailabilitySlot>([...(slots ?? []), ...localSlots].map((slot): [string, AvailabilitySlot] => [slot.id, slot])).values())
+    : Array.from(new Map<string, AvailabilitySlot>([...localSlots, ...(slots ?? [])].map((slot): [string, AvailabilitySlot] => [slot.id, slot])).values())
         .sort((a, b) => `${String(a.available_date).slice(0, 10)}${String(a.start_time)}`.localeCompare(`${String(b.available_date).slice(0, 10)}${String(b.start_time)}`));
 
   const handleCreate = useCallback(
@@ -149,7 +141,7 @@ export default function PhotographerAvailabilityPage() {
       <div className="p-6 rounded-sm border line-border bg-surface space-y-4">
         <h2 className="text-lg font-bold mb-3">Add availability slot</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Input label="Date" type="date" name="date" min={today} max={plus90} value={date} onChange={(e) => setDate(e.target.value)} required />
+          <Input label="Date" type="date" name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
           <Input label="Start time" type="time" name="startTime" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
           <Input label="End time" type="time" name="endTime" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
           <div className="sm:col-span-3">
@@ -172,13 +164,15 @@ export default function PhotographerAvailabilityPage() {
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="text-sm font-bold">{new Date(`${String(s.available_date).slice(0, 10)}T00:00:00`).toLocaleDateString()}</h3>
                 <span className={`text-[10px] uppercase tracking-wider font-bold border rounded px-2 py-0.5 ${s.is_available ? "text-orange bg-orange/10 border border-orange/20" : "text-muted border-line-border bg-transparent"}`}>
-                  {s.is_available ? "Available" : "Unavailable"}
+                  {s.is_booked ? "Booked" : s.is_available ? "Available" : "Unavailable"}
                 </span>
               </div>
               <p className="text-muted text-sm">{String(s.start_time).slice(0, 5)} &ndash; {String(s.end_time).slice(0, 5)}</p>
-              <Button type="button" variant="outline" disabled={slotBusy === s.id} onClick={() => toggleSlot(s)} className="mt-3">
-                {slotBusy === s.id ? "Updating…" : s.is_available ? "Mark unavailable" : "Mark available"}
-              </Button>
+              {s.is_booked ? <p className="mt-3 text-xs text-muted">This time is reserved by an active booking.</p> : (
+                <Button type="button" variant="outline" disabled={slotBusy === s.id} onClick={() => toggleSlot(s)} className="mt-3">
+                  {slotBusy === s.id ? "Updating…" : s.is_available ? "Mark unavailable" : "Mark available"}
+                </Button>
+              )}
             </div>
           ))
         )}

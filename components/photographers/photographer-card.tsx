@@ -35,7 +35,7 @@ export function PhotographerCard({
   const [avatarFailed, setAvatarFailed] = useState(false);
   const { user } = useAuth();
   const displayName = full_name || "Photographer";
-  const canBook = !!user && !user.roles?.includes("PHOTOGRAPHER");
+  const canBook = !!user?.roles?.includes("CLIENT");
   const isClient = !!user && user.roles?.includes("CLIENT");
 
   return (
