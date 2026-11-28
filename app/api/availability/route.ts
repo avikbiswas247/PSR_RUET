@@ -33,9 +33,12 @@ export async function GET(request: Request) {
     const photographerId = url.searchParams.get("photographerId");
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
+    const requestedLimit = url.searchParams.get("limit");
+    const limit = requestedLimit === null ? 500 : Number(requestedLimit);
+    const openOnly = url.searchParams.get("openOnly") === "true";
     if (!photographerId || !from || !to) return jsonError("photographerId, from and to are required.", 422, "MISSING_FIELDS");
     if (!isValidUuid(photographerId)) return jsonError("Invalid photographer ID.", 400, "INVALID_PHOTOGRAPHER_ID");
-    return jsonOk(await AvailabilityService.listAvailability(photographerId, from, to));
+    return jsonOk(await AvailabilityService.listAvailability(photographerId, from, to, limit, openOnly));
   } catch (error) { return handleAvailabilityApiError(error); }
 }
 

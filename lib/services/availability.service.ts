@@ -28,10 +28,11 @@ export async function addAvailability(i:{authenticatedPhotographerId:string;date
   if (!slot) throw new AvailabilityServiceError("The availability slot could not be saved. Please try again.", "SAVE_FAILED");
   return slot;
 }
-export const listAvailability=(photographerId:string,from:string,to:string)=>{
+export const listAvailability=(photographerId:string,from:string,to:string,limit=500,openOnly=false)=>{
   if (!isValidIsoDate(from) || !isValidIsoDate(to)) throw new AvailabilityServiceError("Choose a valid availability date range.", "INVALID_DATE");
   if(to<from) throw new AvailabilityServiceError("The end date must be on or after the start date.", "INVALID_RANGE");
-  return AvailabilityRepo.listPhotographerAvailability(photographerId,from,to);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new AvailabilityServiceError("The availability result limit is invalid.", "INVALID_RANGE");
+  return AvailabilityRepo.listPhotographerAvailability(photographerId,from,to,limit,openOnly);
 };
 export async function setSlotAvailability(id: string, photographerId: string, available: boolean) {
   const slot = await AvailabilityRepo.setAvailability(id, photographerId, available);

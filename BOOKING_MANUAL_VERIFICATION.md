@@ -11,10 +11,10 @@ The repository has no test script or booking integration-test setup. Use this ch
 
 ## 2. Confirm availability persistence and visibility
 
-1. As that photographer, add a future date and a valid start/end time on `/photographer/availability`.
+1. As that photographer, add a future date and a valid start/end time on `/photographer/availability`. Include one date more than 90 days ahead.
 2. Confirm the response is `201` and `data.id` plus `data.photographer_id` are present; `photographer_id` must match the profile `user_id`.
 3. Reload the availability dashboard. Confirm the slot remains present.
-4. Open the public profile and the booking page. Confirm the slot appears in upcoming availability and can be selected.
+4. Open the public profile and the booking page. Confirm the slot appears in upcoming availability and can be selected, including the date more than 90 days ahead. On the booking page, advance the calendar to that month.
 5. Mark an unbooked slot unavailable, reload, and confirm it no longer appears as bookable. Restore it and confirm it appears again.
 6. Inspect PostgreSQL using the deployed schema: verify the slot row in `photographer_availability` and compare its ID, photographer ID, date, times, and `is_available` value with the API response.
 
@@ -24,8 +24,9 @@ The repository has no test script or booking integration-test setup. Use this ch
 2. Confirm the page redirects only after a `201` response containing a server-generated booking number.
 3. Confirm the booking appears in `/account/bookings` with `PENDING` status and the correct photographer summary.
 4. Inspect PostgreSQL: verify one `bookings` row with the authenticated client user ID, photographer user ID, selected schedule, and `PENDING` status. Confirm a photographer notification row was created.
-5. In two separate client sessions, submit requests for the same photographer/date and overlapping time at nearly the same time. Expect exactly one `201`; the other request should receive `409`. Inspect PostgreSQL and confirm only one active overlapping booking exists.
-6. Try an unauthenticated request, a photographer account, an unknown photographer, a past date, an unavailable time, a reversed time range, a negative budget, malformed JSON, and an invalid UUID. Expect rejection with an appropriate `4xx` response and no booking row.
+5. Confirm the photographer receives a booking request email at the account email address. Verify it includes the request details and a link to `/photographer/bookings/{booking-id}`.
+6. In two separate client sessions, submit requests for the same photographer/date and overlapping time at nearly the same time. Expect exactly one `201`; the other request should receive `409`. Inspect PostgreSQL and confirm only one active overlapping booking exists.
+7. Try an unauthenticated request, a photographer account, an unknown photographer, a past date, an unavailable time, a reversed time range, a negative budget, malformed JSON, and an invalid UUID. Expect rejection with an appropriate `4xx` response and no booking row.
 
 ## 4. Confirm photographer and client actions
 
@@ -40,4 +41,11 @@ The repository has no test script or booking integration-test setup. Use this ch
 
 ## 5. Record results
 
-Record each result as passed, failed, or blocked. Include the HTTP status and response code, relevant row IDs/statuses, and notification result. A successful build or type check does not replace these database-backed checks. The local environment used for the code repair could not connect to PostgreSQL, so none of these runtime scenarios are marked as passed here.
+Record each result as passed, failed, or blocked. Include the HTTP status and response code, relevant row IDs/statuses, and notification and email results. A successful build or type check does not replace these database-backed checks.
+
+## Verification run (2026-11-29)
+
+- Passed: `npx tsc --noEmit`, `npm run build`, and ESLint on the changed application files (0 errors; existing warnings remain).
+- Passed: local unauthenticated `GET /api/bookings` smoke check returned HTTP `401`.
+- Blocked: a read-only PostgreSQL connectivity check was denied with `EACCES` in this environment, so no real booking/status workflow could be created or verified.
+- Blocked: SMTP verification could not resolve the provider (`EDNS`), so delivery could not be confirmed and no test email was sent.

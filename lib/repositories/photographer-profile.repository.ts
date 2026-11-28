@@ -42,7 +42,7 @@ export function listPhotographerProfiles(limit = 50, offset = 0, filters?: { sea
       WHERE pa.photographer_id = pp.user_id
         AND pa.is_available = TRUE
         AND pa.available_date BETWEEN (NOW() AT TIME ZONE 'Asia/Dhaka')::date
-          AND (NOW() AT TIME ZONE 'Asia/Dhaka')::date + 90
+          AND '9999-12-31'::date
         AND NOT EXISTS (
           SELECT 1 FROM bookings b
           WHERE b.photographer_id = pa.photographer_id

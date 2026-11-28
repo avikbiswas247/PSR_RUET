@@ -23,7 +23,7 @@ export default function PhotographerAvailabilityPage() {
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const url = profile?.user_id
-    ? `/api/availability?photographerId=${profile.user_id}&from=0001-01-01&to=9999-12-31&refresh=${refreshKey}`
+    ? `/api/availability?photographerId=${profile.user_id}&from=0001-01-01&to=9999-12-31&limit=1000&refresh=${refreshKey}`
     : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=0001-01-01&to=9999-12-31";
   const { data: slots, loading: slotsLoading, error } = useApi<
     AvailabilitySlot[] | null

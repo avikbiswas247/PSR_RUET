@@ -7,6 +7,7 @@ import * as NotificationRepo from "@/lib/repositories/notification.repository";
 import * as UserRepo from "@/lib/repositories/user.repository";
 import * as ClientProfileRepo from "@/lib/repositories/client-profile.repository";
 import * as PhotographerProfileRepo from "@/lib/repositories/photographer-profile.repository";
+import { sendBookingRequestEmail } from "@/lib/email/send-booking-request";
 
 export class BookingServiceError extends Error {
   constructor(message: string, public code: string) {
@@ -30,12 +31,6 @@ function dhakaDate(date = new Date()) {
   }).formatToParts(date);
   const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
-function addDays(date: string, days: number) {
-  const [year, month, day] = date.split("-").map(Number);
-  const next = new Date(Date.UTC(year, month - 1, day + days));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
 }
 
 function isValidIsoDate(value: string) {
@@ -77,9 +72,7 @@ export async function requestBooking(input: {
   if (location.length > 240) throw new BookingServiceError("Location must be 240 characters or less.", "INVALID_LOCATION");
   if (!isValidIsoDate(input.bookingDate)) throw new BookingServiceError("Choose a valid session date.", "INVALID_DATE");
   const firstBookableDate = dhakaDate();
-  const lastBookableDate = addDays(firstBookableDate, 90);
   if (input.bookingDate < firstBookableDate) throw new BookingServiceError("The session date cannot be in the past.", "PAST_DATE");
-  if (input.bookingDate > lastBookableDate) throw new BookingServiceError("Choose a date within the next 90 days.", "DATE_OUT_OF_RANGE");
   const startValue = timeValue(input.startTime);
   const endValue = timeValue(input.endTime);
   if (startValue === null || endValue === null || endValue <= startValue) {
@@ -137,6 +130,36 @@ export async function requestBooking(input: {
     message: `${clientUser?.full_name ?? "A client"} requested ${title} for ${input.bookingDate}. Booking ${booking.booking_number}.`,
     type: "booking_request",
   }, booking.id);
+
+  const [photographerUser, photographerProfile] = await Promise.all([
+    UserRepo.getUserById(booking.photographer_id).catch(() => null),
+    PhotographerProfileRepo.getPhotographerProfileByUserId(booking.photographer_id).catch(() => null),
+  ]);
+  if (photographerUser?.email) {
+    try {
+      await sendBookingRequestEmail({
+        to: photographerUser.email,
+        photographerName: photographerUser.full_name || "Photographer",
+        clientName: clientUser?.full_name || "A client",
+        clientEmail: clientUser?.email || null,
+        bookingId: booking.id,
+        bookingNumber: booking.booking_number,
+        title: booking.title || title,
+        message: booking.description || description,
+        photographyType: booking.photography_type || photographyType || null,
+        location: booking.location || location || null,
+        date: input.bookingDate,
+        startTime: String(booking.start_time).slice(0, 5),
+        endTime: String(booking.end_time).slice(0, 5),
+        budget: booking.budget == null ? null : Number(booking.budget),
+        photographerTitle: photographerProfile?.title || null,
+      });
+    } catch (error) {
+      console.error("[Booking] Email could not be sent for booking", booking.id, error instanceof Error ? error.message : "Unknown error");
+    }
+  } else {
+    console.error("[Booking] Photographer email is missing for booking", booking.id);
+  }
   return booking;
 }
 

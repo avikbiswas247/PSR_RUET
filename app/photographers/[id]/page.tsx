@@ -36,10 +36,8 @@ export default function PhotographerDetailPage({
   const { data: photos, loading: photosLoading } = useApi<PublicPhoto[] | null>(
     isValidUuid ? `/api/photos?photographer_id=${photographerId}` : ""
   );
-  const availabilityEnd = new Date();
-  availabilityEnd.setDate(availabilityEnd.getDate() + 90);
   const availabilityUrl = photographer?.user_id
-    ? `/api/availability?photographerId=${photographer.user_id}&from=${localDateString(new Date())}&to=${localDateString(availabilityEnd)}`
+    ? `/api/availability?photographerId=${photographer.user_id}&from=${localDateString(new Date())}&to=9999-12-31&limit=6&openOnly=true`
     : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
   const { data: slots } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
   const openSlots = photographer?.is_available ? (slots ?? []).filter((slot) => slot.is_available) : [];
@@ -301,7 +299,7 @@ export default function PhotographerDetailPage({
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold">Upcoming availability</h2>
-              <p className="mt-1 text-xs text-muted">Open booking slots in the next 90 days.</p>
+              <p className="mt-1 text-xs text-muted">Upcoming open booking slots.</p>
             </div>
             {canBook && <Link href={`/book/${photographerId}`} className="text-xs font-bold text-orange hover:underline">Book a session</Link>}
           </div>

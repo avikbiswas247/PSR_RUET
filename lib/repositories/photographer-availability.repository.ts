@@ -3,7 +3,7 @@ export interface PhotographerAvailability {
   id: string; photographer_id: string; available_date: string | Date;
   start_time: string; end_time: string; is_available: boolean; is_booked?: boolean; created_at: string | Date;
 }
-export function listPhotographerAvailability(photographerId: string, fromDate: string, toDate: string) {
+export function listPhotographerAvailability(photographerId: string, fromDate: string, toDate: string, limit = 500, openOnly = false) {
   return many<PhotographerAvailability>(
     `SELECT pa.*,
        (pa.is_available AND reservation.has_booking IS DISTINCT FROM TRUE) AS is_available,
@@ -19,7 +19,9 @@ export function listPhotographerAvailability(photographerId: string, fromDate: s
        LIMIT 1
      ) reservation ON TRUE
      WHERE pa.photographer_id = $1 AND pa.available_date BETWEEN $2 AND $3
-     ORDER BY pa.available_date, pa.start_time`, [photographerId, fromDate, toDate],
+       AND (NOT $5::boolean OR (pa.is_available = TRUE AND reservation.has_booking IS DISTINCT FROM TRUE))
+     ORDER BY pa.available_date, pa.start_time
+     LIMIT $4`, [photographerId, fromDate, toDate, limit, openOnly],
   );
 }
 export function findAvailableSlot(photographerId: string, date: string, startTime: string, endTime: string) {

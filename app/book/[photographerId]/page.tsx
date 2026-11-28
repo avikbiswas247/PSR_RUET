@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/input";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/lib/hooks/use-api";
 import { PublicPhotographer } from "@/lib/types/public";
@@ -36,6 +35,14 @@ function localDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function monthDateRange(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return {
+    from: `${month}-01`,
+    to: localDateString(new Date(year, monthNumber, 0)),
+  };
+}
+
 function isoDate(value: string | Date) {
   return String(value).slice(0, 10);
 }
@@ -48,13 +55,9 @@ export default function BookPhotographerPage({
   const router = useRouter();
   const { photographerId } = use(params);
   const submitRef = useRef(false);
-
-  const [fromDate] = useState(() => localDateString(new Date()));
-  const [toDate] = useState(() => {
-    const end = new Date();
-    end.setDate(end.getDate() + 90);
-    return localDateString(end);
-  });
+  const currentMonth = localDateString(new Date()).slice(0, 7);
+  const [calendarMonth, setCalendarMonth] = useState(currentMonth);
+  const { from: fromDate, to: toDate } = useMemo(() => monthDateRange(calendarMonth), [calendarMonth]);
   const [availabilityVersion, setAvailabilityVersion] = useState(0);
 
   const { data: photographer, loading: photoLoading, error: photoError } =
@@ -75,7 +78,6 @@ export default function BookPhotographerPage({
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState(() => localDateString(new Date()).slice(0, 7));
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -94,7 +96,10 @@ export default function BookPhotographerPage({
           const draft = JSON.parse(saved) as { formData?: typeof formData; selectedSlot?: AvailabilitySlot | null; selectedDate?: string | null };
           if (draft.formData) setFormData((current) => ({ ...current, ...draft.formData }));
           if (draft.selectedSlot) setSelectedSlot(draft.selectedSlot);
-          if (draft.selectedDate) setSelectedDate(draft.selectedDate);
+          if (draft.selectedDate) {
+            setSelectedDate(draft.selectedDate);
+            setCalendarMonth(draft.selectedDate.slice(0, 7));
+          }
         } catch {
           sessionStorage.removeItem(`psr-booking-draft:${photographerId}`);
         }
@@ -115,8 +120,10 @@ export default function BookPhotographerPage({
     [allSlots]
   );
   const slotsForSelectedDate = useMemo(
-    () => (selectedDate ? allSlots.filter((s) => isoDate(s.available_date) === selectedDate) : []),
-    [allSlots, selectedDate]
+    () => (selectedDate && photographer?.is_available !== false
+      ? allSlots.filter((s) => isoDate(s.available_date) === selectedDate && s.is_available)
+      : []),
+    [allSlots, photographer?.is_available, selectedDate]
   );
 
   const hasAvailability = photographer?.is_available !== false && availableSlots.length > 0;
@@ -129,16 +136,13 @@ export default function BookPhotographerPage({
   const daysInMonth = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
   const firstDayOfMonth = useMemo(() => new Date(year, month - 1, 1).getDay(), [year, month]);
   const todayIso = localDateString(new Date());
-  const maxBookableDate = toDate;
-  const lastBookableMonth = maxBookableDate.slice(0, 7);
-
   const availableDatesSet = useMemo(() => {
     const set = new Set<string>();
     for (const s of allSlots) {
-      if (s.is_available) set.add(isoDate(s.available_date));
+      if (s.is_available && photographer?.is_available !== false) set.add(isoDate(s.available_date));
     }
     return set;
-  }, [allSlots]);
+  }, [allSlots, photographer?.is_available]);
 
   const calendarDates: CalendarDate[] = useMemo(() => {
     const dates: CalendarDate[] = [];
@@ -147,7 +151,7 @@ export default function BookPhotographerPage({
     }
     for (let d = 1; d <= daysInMonth; d++) {
       const iso = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      const isPast = iso < todayIso || iso > maxBookableDate;
+      const isPast = iso < todayIso;
       const hasAvailability = availableDatesSet.has(iso);
       dates.push({
         date: d,
@@ -160,7 +164,7 @@ export default function BookPhotographerPage({
       });
     }
     return dates;
-  }, [year, month, daysInMonth, firstDayOfMonth, todayIso, maxBookableDate, availableDatesSet, allSlots, selectedDate]);
+  }, [year, month, daysInMonth, firstDayOfMonth, todayIso, availableDatesSet, allSlots, selectedDate]);
 
   const prevMonth = () => {
     const [y, m] = calendarMonth.split("-").map(Number);
@@ -337,30 +341,6 @@ export default function BookPhotographerPage({
     );
   }
 
-  // No availability at all
-  if (!hasAvailability && !slotsLoading) {
-    return (
-      <div className="min-h-[calc(100vh-92px)] bg-[#090909]">
-        <div className="section-pad max-w-[720px] mx-auto">
-          <div className="flex items-center justify-between mb-12">
-            <div>
-              <h1 className="text-[32px] tracking-tight font-bold text-white mb-1">Book with {photographer.full_name}</h1>
-              <p className="text-muted text-lg mb-8">Select an available time slot and confirm your booking.</p>
-            </div>
-            <Link href={`/photographers/${photographerId}`} className="text-sm text-orange font-bold hover:underline inline-flex items-center gap-1">
-              &#8592; View profile
-            </Link>
-          </div>
-          <EmptyState
-            title="No availability"
-            description={`${photographer.full_name} has no available time slots right now. Please check back later.`}
-            action={{ label: "Browse photographers", href: "/book" }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   const noticeBox = notice ? (
     <div className={`p-4 rounded-[10px] mb-6 text-sm ${
       noticeType === "success"
@@ -488,7 +468,6 @@ export default function BookPhotographerPage({
                   </span>
                   <button
                     onClick={nextMonth}
-                    disabled={calendarMonth >= lastBookableMonth}
                     className="p-2 rounded-[8px] border border-[rgba(255,255,255,0.13)] bg-transparent text-muted hover:text-white hover:border-orange disabled:opacity-40 disabled:pointer-events-none transition-all"
                     aria-label="Next month"
                   >
