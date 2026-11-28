@@ -2,6 +2,10 @@
 
 The repository has no test script or booking integration-test setup. Use this checklist with a connected PostgreSQL database and separate verified test accounts. Do not run the concurrent booking check against real customer slots.
 
+## Apply the additive schema migration first
+
+Apply `migrations/0017_client_booking_preferences_and_notification_links.sql` to the application database before deploying this version. It adds client booking preferences and notification destination links to the existing tables. The migration is additive and safe to re-run. This checkout has no general migration command, and the configured PostgreSQL host was unreachable from the verification environment, so the migration has not been applied here.
+
 ## 1. Confirm identity mapping and discovery
 
 1. Sign in as a photographer and open `/api/photographers/me`. Record the profile `id` and `user_id`.
@@ -43,9 +47,19 @@ The repository has no test script or booking integration-test setup. Use this ch
 
 Record each result as passed, failed, or blocked. Include the HTTP status and response code, relevant row IDs/statuses, and notification and email results. A successful build or type check does not replace these database-backed checks.
 
+## 6. Confirm client profile, dashboard, notification, and conversation flows
+
+1. As a client, save personal details, organization/billing details, preferred services, contact method, and booking notes in `/account/profile`. Reload and confirm the saved values and completion indicator. Confirm the account email is read-only and avatar upload updates the profile image.
+2. Open `/account` and confirm summary counts, upcoming sessions, recent booking/notification activity, and recommended photographers load from the signed-in client's data. Check the mobile navigation and quick actions.
+3. Open a booking draft, enter session details and a required booking message, select a future available slot, then refresh. Confirm the draft is restored for that same signed-in client and photographer. Sign out or change client accounts and confirm the previous client's draft is not shown.
+4. Create a booking request and confirm the photographer's notification links to the request. Confirm it appears in the photographer's booking inbox, and the client appears with profile details. Accept or reject it and confirm the client is notified with a link to the booking.
+5. Open the booking conversation as either participant. Send a message and confirm only the other participant receives a notification. Confirm the conversation refreshes within 15 seconds, pauses while the page is hidden, and resumes when visible. Reload and confirm the messages persist.
+6. Open the notification center as both roles. Confirm unread counts appear in desktop and mobile navigation, clicking a notification opens its booking/conversation, and mark-all-read clears the count.
+
 ## Verification run (2026-11-29)
 
-- Passed: `npx tsc --noEmit`, `npm run build`, and ESLint on the changed application files (0 errors; existing warnings remain).
+- Passed: `npx tsc --noEmit`, `npm run build`, and targeted ESLint on the changed application files (0 errors; image and unused-import warnings remain).
+- Failed: full `npm run lint` reports 7 errors in pre-existing admin pages and shared UI files (`app/admin/(protected)/events/page.client.tsx`, `app/admin/(protected)/exhibitions/page.client.tsx`, `components/admin/cover-image-field.tsx`, `components/admin/homepage-featured-photos-editor.tsx`, and `components/ui/empty-state.tsx`).
 - Passed: local unauthenticated `GET /api/bookings` smoke check returned HTTP `401`.
-- Blocked: a read-only PostgreSQL connectivity check was denied with `EACCES` in this environment, so no real booking/status workflow could be created or verified.
+- Blocked: a read-only PostgreSQL connectivity check was denied with `EACCES` in this environment, so the migration could not be applied and no real booking/status workflow could be created or verified.
 - Blocked: SMTP verification could not resolve the provider (`EDNS`), so delivery could not be confirmed and no test email was sent.

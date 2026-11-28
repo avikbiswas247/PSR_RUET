@@ -129,6 +129,7 @@ export async function requestBooking(input: {
     title: "New Booking Request",
     message: `${clientUser?.full_name ?? "A client"} requested ${title} for ${input.bookingDate}. Booking ${booking.booking_number}.`,
     type: "booking_request",
+    linkUrl: `/photographer/bookings/${booking.id}`,
   }, booking.id);
 
   const [photographerUser, photographerProfile] = await Promise.all([
@@ -163,7 +164,7 @@ export async function requestBooking(input: {
   return booking;
 }
 
-async function notifyBookingParticipant(userId: string, notification: { title: string; message: string; type?: string }, bookingId: string) {
+async function notifyBookingParticipant(userId: string, notification: { title: string; message: string; type?: string; linkUrl?: string }, bookingId: string) {
   try {
     await NotificationRepo.createNotification({
       user_id: userId,
@@ -172,6 +173,7 @@ async function notifyBookingParticipant(userId: string, notification: { title: s
       notification_type: notification.type ?? "booking_status",
       is_read: false,
       read_at: null,
+      link_url: notification.linkUrl ?? null,
     });
   } catch (error) {
     console.error("[Booking] Notification could not be created for booking", bookingId, error instanceof Error ? error.message : "Unknown error");
@@ -221,6 +223,7 @@ export async function setBookingStatus(input: {
   await Promise.all(result.recipientIds.map((recipientId) => notifyBookingParticipant(recipientId, {
     title: titleByStatus[input.status],
     message: `Booking ${result.booking.booking_number} for ${result.booking.title ?? "your session"} is now ${input.status.toLowerCase()}.`,
+    linkUrl: `${recipientId === result.booking.photographer_id ? "/photographer" : "/account"}/bookings/${result.booking.id}`,
   }, result.booking.id)));
   return result.booking;
 }
@@ -234,7 +237,17 @@ export async function sendBookingMessage(input: { bookingId: string; authenticat
   const message = input.message.trim();
   if (!message) throw new BookingServiceError("Message cannot be empty.", "INVALID_MESSAGE");
   if (message.length > 2000) throw new BookingServiceError("Messages must be 2,000 characters or less.", "INVALID_MESSAGE");
-  return MessageRepo.createBookingMessage({ booking_id: booking.id, sender_user_id: input.authenticatedUserId, message });
+  const savedMessage = await MessageRepo.createBookingMessage({ booking_id: booking.id, sender_user_id: input.authenticatedUserId, message });
+  const recipientId = booking.client_id === input.authenticatedUserId ? booking.photographer_id : booking.client_id;
+  const sender = await UserRepo.getUserById(input.authenticatedUserId).catch(() => null);
+  const recipientIsPhotographer = recipientId === booking.photographer_id;
+  await notifyBookingParticipant(recipientId, {
+    title: "New booking message",
+    message: `${sender?.full_name ?? "A participant"} sent a message about booking ${booking.booking_number}.`,
+    type: "booking_message",
+    linkUrl: `${recipientIsPhotographer ? "/photographer" : "/account"}/bookings/${booking.id}/messages`,
+  }, booking.id);
+  return savedMessage;
 }
 
 export async function listMessagesForParticipant(bookingId: string, userId: string) {
@@ -251,6 +264,15 @@ export const listPayments = (bookingId: string) => PaymentRepo.listPaymentsForBo
 export async function listMyBookings(clientId: string, limit = 50, offset = 0) {
   validatePagination(limit, offset);
   return BookingRepo.listBookingsForClientWithPhotographer(clientId, limit, offset);
+}
+
+export async function getClientDashboardData(clientId: string) {
+  const [summary, upcoming, recent] = await Promise.all([
+    BookingRepo.getClientDashboardSummary(clientId),
+    BookingRepo.listUpcomingBookingsForClient(clientId, 5),
+    BookingRepo.listBookingsForClientWithPhotographer(clientId, 5, 0),
+  ]);
+  return { summary, upcoming, recent };
 }
 
 export async function listPhotographerBookings(photographerId: string, limit = 50, offset = 0) {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import { PhotographerProfileMe, PublicBooking, PublicPhoto, PublicPortfolio } from "@/lib/types/public";
+import { formatDhakaDate, formatDhakaTime } from "@/lib/utils/dhaka-time";
 
 interface AvailabilitySlot {
   id: string;
@@ -124,8 +125,8 @@ export default function PhotographerDashboardPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(availability ?? []).filter((slot) => slot.is_available).slice(0, 6).map((slot) => (
               <div key={slot.id} className="rounded-sm border line-border bg-bg p-3">
-                <p className="text-sm font-semibold">{new Date(`${String(slot.available_date).slice(0, 10)}T00:00:00`).toLocaleDateString()}</p>
-                <p className="mt-1 text-xs text-muted">{String(slot.start_time).slice(0, 5)} – {String(slot.end_time).slice(0, 5)}</p>
+                <p className="text-sm font-semibold">{formatDhakaDate(slot.available_date, { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</p>
+                <p className="mt-1 text-xs text-muted">{formatDhakaTime(slot.start_time)} – {formatDhakaTime(slot.end_time)} · Dhaka time</p>
               </div>
             ))}
           </div>

@@ -126,12 +126,27 @@ export interface PublicBooking {
   updated_at: string | Date;
 }
 
+export interface ClientDashboardData {
+  summary: { total: number; pending: number; accepted: number; upcoming_confirmed: number; completed: number };
+  upcoming: PublicBooking[];
+  recent: PublicBooking[];
+}
+
+export interface ClientProfileData {
+  organization_name: string | null;
+  billing_address: string | null;
+  preferred_services: string[];
+  preferred_contact_method: string | null;
+  booking_notes: string | null;
+}
+
 export interface PublicNotification {
   id: string;
   user_id: string;
   title: string;
   message: string;
   notification_type: string | null;
+  link_url: string | null;
   is_read: boolean;
   read_at: string | Date | null;
   created_at: string | Date;

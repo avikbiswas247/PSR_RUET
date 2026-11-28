@@ -6,19 +6,18 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 import { useApi } from "@/lib/hooks/use-api";
 import { PublicBooking } from "@/lib/types/public";
+import { dhakaDateString, formatDhakaDate, formatDhakaTime } from "@/lib/utils/dhaka-time";
 
 const FILTERS = ["ALL", "PENDING", "ACCEPTED", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED"] as const;
 type Filter = (typeof FILTERS)[number];
 type Sort = "newest" | "oldest" | "upcoming";
 
 function displayDate(value: string | Date) {
-  return new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: "short", year: "numeric", month: "short", day: "numeric",
-  });
+  return formatDhakaDate(value, { weekday: "short", year: "numeric", month: "short", day: "numeric" });
 }
 
 function displayTime(value: string | Date) {
-  return String(value).slice(0, 5);
+  return formatDhakaTime(value);
 }
 
 export default function AccountBookingsPage() {
@@ -30,7 +29,16 @@ export default function AccountBookingsPage() {
     const filtered = (data ?? []).filter((booking) => filter === "ALL" || booking.status === filter);
     return [...filtered].sort((a, b) => {
       if (sort === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      if (sort === "upcoming") return String(a.booking_date).slice(0, 10).localeCompare(String(b.booking_date).slice(0, 10));
+      if (sort === "upcoming") {
+        const today = dhakaDateString();
+        const aDate = String(a.booking_date).slice(0, 10);
+        const bDate = String(b.booking_date).slice(0, 10);
+        const aUpcoming = aDate >= today;
+        const bUpcoming = bDate >= today;
+        if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+        const byDate = aDate.localeCompare(bDate);
+        return byDate || displayTime(a.start_time).localeCompare(displayTime(b.start_time));
+      }
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [data, filter, sort]);
@@ -82,13 +90,16 @@ export default function AccountBookingsPage() {
           {bookings.map((booking) => (
             <article key={booking.id} className="rounded-sm border line-border bg-surface p-5 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
+                <div className="flex min-w-0 items-center gap-3">
+                  {booking.photographer_profile?.avatar_url ? <img src={booking.photographer_profile.avatar_url} alt="" className="h-12 w-12 shrink-0 rounded-full border line-border object-cover" /> : <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border line-border bg-orange/10 font-bold text-orange">{booking.photographer_profile?.full_name?.slice(0, 1) || "P"}</span>}
+                  <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted">{booking.booking_number}</p>
                   <h2 className="mt-1 text-xl font-bold">{booking.title || "Photography session"}</h2>
                   <p className="mt-1 text-sm text-muted">
                     {booking.photographer_profile?.full_name ? `With ${booking.photographer_profile.full_name}` : "Photographer"}
                     {booking.photographer_profile?.photography_genre ? ` · ${booking.photographer_profile.photography_genre}` : ""}
                   </p>
+                  </div>
                 </div>
                 <BookingStatusBadge status={booking.status} />
               </div>
@@ -98,6 +109,7 @@ export default function AccountBookingsPage() {
                 <div><dt className="text-[10px] uppercase tracking-wider text-muted">Location</dt><dd className="mt-1">{booking.location || "To be arranged"}</dd></div>
                 <div><dt className="text-[10px] uppercase tracking-wider text-muted">Proposed budget</dt><dd className="mt-1">{booking.budget == null ? "Not specified" : `BDT ${Number(booking.budget).toLocaleString()}`}</dd></div>
               </dl>
+              {booking.description && <p className="mt-4 line-clamp-2 text-sm text-muted">{booking.description}</p>}
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t line-border pt-4">
                 <p className="text-xs text-muted">Requested {new Date(booking.created_at).toLocaleDateString()}</p>
                 <Link href={`/account/bookings/${booking.id}`} className="text-xs font-bold text-orange hover:underline">View booking details →</Link>

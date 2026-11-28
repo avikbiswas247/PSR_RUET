@@ -8,7 +8,12 @@ type Body = { photographerId?: string; title?: string; description?: string | nu
 export async function GET(request: Request) {
   try {
     const auth = await requireUser(); if (isResponse(auth)) return auth;
-    const { limit, offset } = getPagination(new URL(request.url));
+    const url = new URL(request.url);
+    if (url.searchParams.get("view") === "dashboard") {
+      if (!auth.roles.includes("CLIENT")) return jsonError("Client access is required.", 403, "FORBIDDEN");
+      return jsonOk(await BookingService.getClientDashboardData(auth.id));
+    }
+    const { limit, offset } = getPagination(url);
     if (auth.roles.includes("ADMIN")) return jsonOk(await BookingService.listAdminBookings(limit, offset));
     if (auth.roles.includes("PHOTOGRAPHER")) {
       const bookings = await BookingService.listPhotographerBookings(auth.id, limit, offset);

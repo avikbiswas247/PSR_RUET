@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PhotographerProfileMe } from "@/lib/types/public";
 import { useApi } from "@/lib/hooks/use-api";
+import { formatDhakaDate, formatDhakaTime } from "@/lib/utils/dhaka-time";
 
 interface AvailabilitySlot {
   id: string;
@@ -164,12 +165,12 @@ export default function PhotographerAvailabilityPage() {
           slotsList.map((s) => (
             <div key={s.id} className="border line-border rounded-sm p-4">
               <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="text-sm font-bold">{new Date(`${String(s.available_date).slice(0, 10)}T00:00:00`).toLocaleDateString()}</h3>
+                <h3 className="text-sm font-bold">{formatDhakaDate(s.available_date, { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</h3>
                 <span className={`text-[10px] uppercase tracking-wider font-bold border rounded px-2 py-0.5 ${s.is_available ? "text-orange bg-orange/10 border border-orange/20" : "text-muted border-line-border bg-transparent"}`}>
                   {s.is_booked ? "Booked" : s.is_available ? "Available" : "Unavailable"}
                 </span>
               </div>
-              <p className="text-muted text-sm">{String(s.start_time).slice(0, 5)} &ndash; {String(s.end_time).slice(0, 5)}</p>
+              <p className="text-muted text-sm">{formatDhakaTime(s.start_time)} – {formatDhakaTime(s.end_time)} · Dhaka time</p>
               {s.is_booked ? <p className="mt-3 text-xs text-muted">This time is reserved by an active booking.</p> : (
                 <Button type="button" variant="outline" disabled={slotBusy === s.id} onClick={() => toggleSlot(s)} className="mt-3">
                   {slotBusy === s.id ? "Updating…" : s.is_available ? "Mark unavailable" : "Mark available"}

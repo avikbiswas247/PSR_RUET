@@ -1,5 +1,5 @@
 import type { DatabaseClient } from "@/lib/db";
-import { byId, many } from "./_shared";
+import { byId, many, one } from "./_shared";
 
 export interface Booking {
   id: string;
@@ -47,6 +47,41 @@ export function listBookingsForClientWithPhotographer(clientId: string, limit = 
      WHERE b.client_id = $1
      ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
     [clientId, limit, offset],
+  );
+}
+
+export async function getClientDashboardSummary(clientId: string) {
+  const result = await one<{
+    total: number; pending: number; accepted: number; upcoming_confirmed: number; completed: number;
+  }>(
+    `SELECT COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending,
+       COUNT(*) FILTER (WHERE status = 'ACCEPTED')::int AS accepted,
+       COUNT(*) FILTER (WHERE status = 'CONFIRMED' AND (booking_date > (NOW() AT TIME ZONE 'Asia/Dhaka')::date OR (booking_date = (NOW() AT TIME ZONE 'Asia/Dhaka')::date AND end_time > (NOW() AT TIME ZONE 'Asia/Dhaka')::time)))::int AS upcoming_confirmed,
+       COUNT(*) FILTER (WHERE status = 'COMPLETED')::int AS completed
+     FROM ${TABLE} WHERE client_id = $1`,
+    [clientId],
+  );
+  return result ?? { total: 0, pending: 0, accepted: 0, upcoming_confirmed: 0, completed: 0 };
+}
+
+export function listUpcomingBookingsForClient(clientId: string, limit = 5) {
+  return many<Booking & { photographer_profile: Record<string, unknown> | null }>(
+    `SELECT b.*,
+       CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+         'id', pp.id, 'user_id', pp.user_id, 'full_name', u.full_name,
+         'avatar_url', u.avatar_url, 'title', pp.title, 'location', pp.location,
+         'photography_genre', pp.photography_genre
+       ) END AS photographer_profile
+     FROM bookings b
+     LEFT JOIN photographer_profiles pp ON pp.user_id = b.photographer_id
+     LEFT JOIN users u ON u.id = pp.user_id AND u.is_active = TRUE AND u.deleted_at IS NULL
+     WHERE b.client_id = $1
+       AND b.status IN ('PENDING', 'ACCEPTED', 'CONFIRMED')
+       AND (b.booking_date > (NOW() AT TIME ZONE 'Asia/Dhaka')::date OR (b.booking_date = (NOW() AT TIME ZONE 'Asia/Dhaka')::date AND b.end_time > (NOW() AT TIME ZONE 'Asia/Dhaka')::time))
+     ORDER BY b.booking_date ASC, b.start_time ASC
+     LIMIT $2`,
+    [clientId, limit],
   );
 }
 

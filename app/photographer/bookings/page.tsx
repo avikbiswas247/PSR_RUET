@@ -6,12 +6,13 @@ import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import { PublicBooking } from "@/lib/types/public";
+import { formatDhakaDate, formatDhakaTime } from "@/lib/utils/dhaka-time";
 
 const FILTERS = ["ALL", "PENDING", "ACCEPTED", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED"] as const;
 type Filter = (typeof FILTERS)[number];
 
 function displayDate(value: string | Date) {
-  return new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return formatDhakaDate(value, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function PhotographerBookingsPage() {
@@ -39,16 +40,18 @@ export default function PhotographerBookingsPage() {
           {visibleBookings.map((booking) => (
             <article key={booking.id} className="rounded-sm border line-border bg-surface p-5 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border line-border bg-orange/10 font-bold text-orange">{booking.client_profile?.avatar_url ? <img src={booking.client_profile.avatar_url} alt="" className="h-full w-full object-cover" /> : (booking.client_profile?.full_name?.slice(0, 1) || "C")}</div>
                 <div><p className="text-[10px] uppercase tracking-wider text-muted">{booking.booking_number}</p><h2 className="mt-1 text-xl font-bold">{booking.title || "Photography session"}</h2><p className="mt-1 text-sm text-muted">{booking.client_profile?.full_name || "Client"}{booking.client_profile?.organization_name ? ` · ${booking.client_profile.organization_name}` : ""}</p>{booking.client_profile?.email && <a href={`mailto:${booking.client_profile.email}`} className="mt-1 inline-block text-xs text-orange hover:underline">{booking.client_profile.email}</a>}</div>
                 <BookingStatusBadge status={booking.status} />
               </div>
               <dl className="mt-5 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div><dt className="text-[10px] uppercase tracking-wider text-muted">Service</dt><dd className="mt-1">{booking.photography_type || "Not specified"}</dd></div>
-                <div><dt className="text-[10px] uppercase tracking-wider text-muted">Date and time</dt><dd className="mt-1">{displayDate(booking.booking_date)} · {String(booking.start_time).slice(0, 5)}–{String(booking.end_time).slice(0, 5)}</dd></div>
+                <div><dt className="text-[10px] uppercase tracking-wider text-muted">Date and time · Dhaka</dt><dd className="mt-1">{displayDate(booking.booking_date)} · {formatDhakaTime(booking.start_time)}–{formatDhakaTime(booking.end_time)}</dd></div>
                 <div><dt className="text-[10px] uppercase tracking-wider text-muted">Location</dt><dd className="mt-1">{booking.location || "To be arranged"}</dd></div>
                 <div><dt className="text-[10px] uppercase tracking-wider text-muted">Proposed budget</dt><dd className="mt-1">{booking.budget == null ? "Not specified" : `BDT ${Number(booking.budget).toLocaleString()}`}</dd></div>
               </dl>
               {booking.description && <p className="mt-4 line-clamp-2 text-sm text-muted">{booking.description}</p>}
+              <p className="mt-3 text-[10px] uppercase tracking-wider text-muted">Requested {new Date(booking.created_at).toLocaleString(undefined, { timeZone: "Asia/Dhaka" })} · Dhaka time</p>
               <div className="mt-5 flex justify-end border-t line-border pt-4"><Link href={`/photographer/bookings/${booking.id}`} className="text-xs font-bold text-orange hover:underline">Review request and client profile →</Link></div>
             </article>
           ))}

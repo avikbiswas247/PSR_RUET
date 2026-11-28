@@ -1,5 +1,6 @@
 export * as AuthService from "./auth.service";
 export * as UserService from "./user.service";
+export * as ClientProfileService from "./client-profile.service";
 export * as MembershipService from "./membership.service";
 export * as ProfileService from "./community.service";
 export * as PhotoService from "./photo.service";

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { BrandLogo } from "@/components/layout/brand-logo";
+import { NotificationCountBadge } from "@/components/notifications/notification-count";
 
 type SidebarItem = { href: string; label: string; key: string; icon: string };
 
@@ -49,6 +50,7 @@ export function AccountSidebar({
           >
             <span aria-hidden="true">{item.icon}</span>
             {item.label}
+            {item.href.endsWith("/notifications") && <NotificationCountBadge />}
           </Link>
         ))}
       </nav>

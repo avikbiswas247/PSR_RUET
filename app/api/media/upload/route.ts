@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireUser, requireRole, isResponse } from "@/lib/api/guards";
+import { requireUser, isResponse } from "@/lib/api/guards";
 import { uploadImage } from "@/lib/services/media.service";
 export async function POST(request: Request) {
   try {
     const contentLength = Number(request.headers.get("content-length") ?? 0);
     if (contentLength > 11 * 1024 * 1024) return NextResponse.json({ success: false, error: { message: "Upload request exceeds the 10 MB image limit." } }, { status: 413 });
     const auth = await requireUser(); if (isResponse(auth)) return auth;
-    const photographerDenied = requireRole(auth, "PHOTOGRAPHER");
-    const adminDenied = requireRole(auth, "ADMIN");
-    if (photographerDenied && adminDenied) return photographerDenied;
+    if (!auth.roles.some((role) => ["CLIENT", "PHOTOGRAPHER", "ADMIN"].includes(role))) {
+      return NextResponse.json({ success: false, error: { message: "A client, photographer, or administrator account is required to upload images." } }, { status: 403 });
+    }
     const form = await request.formData(); const file = form.get("file");
     if (!(file instanceof File)) return NextResponse.json({ success: false, error: { message: "A file field is required." } }, { status: 422 });
     const asset = await uploadImage({ file, authenticatedUploaderId: auth.id });

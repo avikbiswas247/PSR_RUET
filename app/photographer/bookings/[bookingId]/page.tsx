@@ -7,6 +7,7 @@ import { useApi } from "@/lib/hooks/use-api";
 import { PublicBooking } from "@/lib/types/public";
 import { notFound } from "next/navigation";
 import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
+import { formatDhakaDate, formatDhakaTime } from "@/lib/utils/dhaka-time";
 
 export default function PhotographerBookingDetailPage({
   params,
@@ -87,17 +88,12 @@ export default function PhotographerBookingDetailPage({
           <div>
             <p className="text-xs font-bold tracking-wider uppercase text-muted mb-1">Date</p>
             <p className="text-muted">
-              {new Date(b.booking_date).toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {formatDhakaDate(b.booking_date)}
             </p>
           </div>
           <div>
-            <p className="text-xs font-bold tracking-wider uppercase text-muted mb-1">Time</p>
-            <p className="text-muted">{String(b.start_time)} &ndash; {String(b.end_time)}</p>
+            <p className="text-xs font-bold tracking-wider uppercase text-muted mb-1">Time · Dhaka</p>
+            <p className="text-muted">{formatDhakaTime(b.start_time)} – {formatDhakaTime(b.end_time)}</p>
           </div>
           <div>
             <p className="text-xs font-bold tracking-wider uppercase text-muted mb-1">Location</p>
@@ -133,7 +129,7 @@ export default function PhotographerBookingDetailPage({
               {b.client_profile.organization_name && <p className="mt-1 text-sm text-muted">{b.client_profile.organization_name}</p>}
               <a href={`mailto:${b.client_profile.email}`} className="mt-1 block text-sm text-orange hover:underline">{b.client_profile.email}</a>
               {b.client_profile.phone && <a href={`tel:${b.client_profile.phone}`} className="mt-1 block text-sm text-orange hover:underline">{b.client_profile.phone}</a>}
-              <p className="mt-1 text-xs text-muted">Joined {new Date(b.client_profile.created_at).toLocaleDateString()}</p>
+              <p className="mt-1 text-xs text-muted">Joined {formatDhakaDate(b.client_profile.created_at, { dateStyle: "medium" })}</p>
             </div>
           </div>
         </section>

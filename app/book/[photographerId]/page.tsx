@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { FormEvent, useMemo, useRef, useState, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/lib/hooks/use-api";
 import { PublicPhotographer } from "@/lib/types/public";
 import { PHOTOGRAPHY_SERVICES } from "@/lib/constants/booking";
+import { dhakaDateString, formatDhakaDate, formatDhakaTime } from "@/lib/utils/dhaka-time";
 
 interface AvailabilitySlot {
   id: string;
@@ -31,15 +33,12 @@ interface CalendarDate {
   availableSlots: AvailabilitySlot[];
 }
 
-function localDateString(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
 function monthDateRange(month: string) {
   const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
   return {
     from: `${month}-01`,
-    to: localDateString(new Date(year, monthNumber, 0)),
+    to: `${year}-${String(monthNumber).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
   };
 }
 
@@ -53,10 +52,13 @@ export default function BookPhotographerPage({
   params: Promise<{ photographerId: string }>;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const { photographerId } = use(params);
   const submitRef = useRef(false);
-  const currentMonth = localDateString(new Date()).slice(0, 7);
+  const currentMonth = dhakaDateString().slice(0, 7);
   const [calendarMonth, setCalendarMonth] = useState(currentMonth);
+  const draftOwnerId = user?.id ?? null;
+  const draftKey = draftOwnerId ? `psr-booking-draft:${draftOwnerId}:${photographerId}` : "";
   const { from: fromDate, to: toDate } = useMemo(() => monthDateRange(calendarMonth), [calendarMonth]);
   const [availabilityVersion, setAvailabilityVersion] = useState(0);
 
@@ -77,42 +79,73 @@ export default function BookPhotographerPage({
   const [reviewing, setReviewing] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [draftReady, setDraftReady] = useState(false);
+  const [loadedDraftKey, setLoadedDraftKey] = useState("");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     location: "",
     photographyType: "",
+    customPhotographyDescription: "",
     budget: "",
   });
+  const photographyService = formData.photographyType === "Other" && formData.customPhotographyDescription.trim()
+    ? `Other: ${formData.customPhotographyDescription.trim().slice(0, 70)}`
+    : formData.photographyType;
 
   useEffect(() => {
-    const saved = sessionStorage.getItem(`psr-booking-draft:${photographerId}`);
     let active = true;
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       if (!active) return;
-      if (saved) {
+      if (!draftOwnerId || !draftKey) {
+        setFormData({ title: "", description: "", location: "", photographyType: "", customPhotographyDescription: "", budget: "" });
+        setSelectedSlot(null);
+        setSelectedDate(null);
+        setCalendarMonth(currentMonth);
+        setLoadedDraftKey("");
+        return;
+      }
+
+      try {
+        const saved = sessionStorage.getItem(draftKey);
+        if (saved) {
         try {
-          const draft = JSON.parse(saved) as { formData?: typeof formData; selectedSlot?: AvailabilitySlot | null; selectedDate?: string | null };
-          if (draft.formData) setFormData((current) => ({ ...current, ...draft.formData }));
-          if (draft.selectedSlot) setSelectedSlot(draft.selectedSlot);
-          if (draft.selectedDate) {
+          const draft = JSON.parse(saved) as { version?: number; userId?: string | null; formData?: Partial<typeof formData>; selectedSlot?: AvailabilitySlot | null; selectedDate?: string | null };
+          if (draft.version !== 1 || draft.userId !== draftOwnerId || !draft.formData || typeof draft.formData !== "object") throw new Error("Outdated booking draft");
+          const stringField = (value: unknown) => typeof value === "string" ? value : "";
+          setFormData({
+            title: stringField(draft.formData.title),
+            description: stringField(draft.formData.description),
+            location: stringField(draft.formData.location),
+            photographyType: stringField(draft.formData.photographyType),
+            customPhotographyDescription: stringField(draft.formData.customPhotographyDescription),
+            budget: stringField(draft.formData.budget),
+          });
+          if (draft.selectedSlot && typeof draft.selectedSlot.id === "string") setSelectedSlot(draft.selectedSlot);
+          if (draft.selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(draft.selectedDate)) {
             setSelectedDate(draft.selectedDate);
             setCalendarMonth(draft.selectedDate.slice(0, 7));
           }
         } catch {
-          sessionStorage.removeItem(`psr-booking-draft:${photographerId}`);
+          sessionStorage.removeItem(draftKey);
         }
       }
-      setDraftReady(true);
+      setLoadedDraftKey(draftKey);
+      } catch {
+        // Storage can be disabled by the browser. Booking should still work without draft persistence.
+        setLoadedDraftKey(draftKey);
+      }
     }, 0);
-    return () => { active = false; };
-  }, [photographerId]);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [currentMonth, draftKey, draftOwnerId]);
 
   useEffect(() => {
-    if (!draftReady) return;
-    sessionStorage.setItem(`psr-booking-draft:${photographerId}`, JSON.stringify({ formData, selectedSlot, selectedDate }));
-  }, [draftReady, photographerId, formData, selectedSlot, selectedDate]);
+    if (!draftOwnerId || !draftKey || loadedDraftKey !== draftKey) return;
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({ version: 1, userId: draftOwnerId, formData, selectedSlot, selectedDate }));
+    } catch {
+      // Draft persistence is optional; keep the interactive booking form usable.
+    }
+  }, [loadedDraftKey, draftKey, draftOwnerId, formData, selectedSlot, selectedDate]);
 
   const allSlots = useMemo(() => slotsLoading ? [] : (slotsData ?? []), [slotsData, slotsLoading]);
   const availableSlots = useMemo(
@@ -133,9 +166,9 @@ export default function BookPhotographerPage({
     return { year: y, month: m };
   }, [calendarMonth]);
 
-  const daysInMonth = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
-  const firstDayOfMonth = useMemo(() => new Date(year, month - 1, 1).getDay(), [year, month]);
-  const todayIso = localDateString(new Date());
+  const daysInMonth = useMemo(() => new Date(Date.UTC(year, month, 0)).getUTCDate(), [year, month]);
+  const firstDayOfMonth = useMemo(() => new Date(Date.UTC(year, month - 1, 1)).getUTCDay(), [year, month]);
+  const todayIso = dhakaDateString();
   const availableDatesSet = useMemo(() => {
     const set = new Set<string>();
     for (const s of allSlots) {
@@ -191,19 +224,11 @@ export default function BookPhotographerPage({
   };
 
   const formatTime = (time: string) => {
-    return new Date(`1970-01-01T${time}`).toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDhakaTime(time);
   };
 
   const formatDate = (iso: string) => {
-    return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    return formatDhakaDate(iso);
   };
 
   const reviewBooking = (e: FormEvent<HTMLFormElement>) => {
@@ -245,7 +270,7 @@ export default function BookPhotographerPage({
           photographerId,
           title: formData.title,
           description: formData.description,
-          photographyType: formData.photographyType,
+          photographyType: photographyService,
           location: formData.location || null,
           bookingDate: isoDate(selectedSlot.available_date),
           startTime: selectedSlot.start_time,
@@ -266,7 +291,9 @@ export default function BookPhotographerPage({
       const bookingNumber = json.data?.booking_number;
       if (!bookingNumber) throw new Error("The booking was saved but no confirmation number was returned. Please check My Bookings.");
       await fetch(availabilityUrl, { cache: "no-store" }).catch(() => null);
-      sessionStorage.removeItem(`psr-booking-draft:${photographerId}`);
+      if (draftKey) {
+        try { sessionStorage.removeItem(draftKey); } catch { /* Ignore disabled browser storage. */ }
+      }
       setAvailabilityVersion((version) => version + 1);
       router.push(`/book/confirm/${bookingNumber}`);
     } catch (err) {
@@ -280,7 +307,7 @@ export default function BookPhotographerPage({
   const canBook = !!selectedSlot && !!formData.title.trim() && !!formData.description.trim() && !!formData.photographyType && !busy;
 
   // Loading state
-  if (photoLoading || slotsLoading) {
+  if ((draftOwnerId ? loadedDraftKey !== draftKey : loadedDraftKey !== "") || photoLoading || slotsLoading) {
     return (
       <div className="min-h-[calc(100vh-92px)] bg-[#090909]">
         <div className="section-pad max-w-[1200px] mx-auto">
@@ -360,6 +387,7 @@ export default function BookPhotographerPage({
             <p className="text-muted text-sm">
               Choose a date and time, then confirm your booking request.
             </p>
+            <p className="mt-1 text-xs text-muted">Calendar dates and session times use Dhaka local time (UTC+6).</p>
           </div>
         <Link href={`/photographers/${photographerId}`} className="text-xs font-bold text-orange hover:underline inline-flex items-center gap-1">
             &#8592; View profile
@@ -457,7 +485,7 @@ export default function BookPhotographerPage({
                 <div className="flex gap-2">
                   <button
                     onClick={prevMonth}
-                    disabled={calendarMonth === localDateString(new Date()).slice(0, 7)}
+                    disabled={calendarMonth === currentMonth}
                     className="p-2 rounded-[8px] border border-[rgba(255,255,255,0.13)] bg-transparent text-muted hover:text-white hover:border-orange disabled:opacity-40 disabled:pointer-events-none transition-all"
                     aria-label="Previous month"
                   >
@@ -608,6 +636,7 @@ export default function BookPhotographerPage({
                     {PHOTOGRAPHY_SERVICES.map((service) => <option key={service} value={service}>{service}</option>)}
                   </select>
                 </div>
+                {formData.photographyType === "Other" && <div><label htmlFor="customPhotographyDescription" className="mb-1.5 block text-[10px] uppercase tracking-wider text-muted">Describe your service <span className="normal-case tracking-normal">(optional)</span></label><Input id="customPhotographyDescription" name="customPhotographyDescription" maxLength={70} value={formData.customPhotographyDescription} onChange={(event) => setFormData((previous) => ({ ...previous, customPhotographyDescription: event.target.value }))} placeholder="Briefly describe the photography service" className="mb-0" /></div>}
                 <div>
                   <label htmlFor="sessionTitle" className="block text-[10px] uppercase tracking-wider text-muted mb-1.5">
                     Session Title
@@ -648,7 +677,7 @@ export default function BookPhotographerPage({
                     maxLength={2000}
                     value={formData.description}
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Share what you need, the occasion, and any important details."
+                    placeholder="Describe the type of photography you need, expected number of photographs, preferred style, event details, and any special requirements."
                     rows={3}
                     className="mb-0"
                   />
@@ -716,7 +745,7 @@ export default function BookPhotographerPage({
                       <p className="text-sm text-muted">{photographer.full_name} · {photographer.photography_genre || "Photographer"}</p>
                     </div>
                     <dl className="grid grid-cols-1 gap-3 rounded-sm border line-border bg-surface-2 p-4 text-sm sm:grid-cols-2">
-                      <div><dt className="text-xs uppercase tracking-wider text-muted">Service</dt><dd className="mt-1 font-medium">{formData.photographyType}</dd></div>
+                      <div><dt className="text-xs uppercase tracking-wider text-muted">Service</dt><dd className="mt-1 font-medium">{photographyService}</dd></div>
                       <div><dt className="text-xs uppercase tracking-wider text-muted">Date</dt><dd className="mt-1 font-medium">{selectedSlot ? formatDate(selectedSlot.available_date) : "Choose a slot"}</dd></div>
                       <div><dt className="text-xs uppercase tracking-wider text-muted">Time</dt><dd className="mt-1 font-medium">{selectedSlot ? `${formatTime(selectedSlot.start_time)} – ${formatTime(selectedSlot.end_time)}` : "Choose a slot"}</dd></div>
                       <div><dt className="text-xs uppercase tracking-wider text-muted">Location</dt><dd className="mt-1 font-medium">{formData.location || "To be arranged"}</dd></div>

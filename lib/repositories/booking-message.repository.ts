@@ -4,11 +4,14 @@ export interface BookingMessage {
 }
 export function listMessagesForBooking(bookingId: string, limit = 100, offset = 0) {
   return many<BookingMessage>(
-    `SELECT bm.*, u.full_name AS sender_name
-     FROM booking_messages bm
-     LEFT JOIN users u ON u.id = bm.sender_user_id
-     WHERE bm.booking_id = $1
-     ORDER BY bm.created_at ASC LIMIT $2 OFFSET $3`,
+    `SELECT * FROM (
+       SELECT bm.*, u.full_name AS sender_name
+       FROM booking_messages bm
+       LEFT JOIN users u ON u.id = bm.sender_user_id
+       WHERE bm.booking_id = $1
+       ORDER BY bm.created_at DESC LIMIT $2 OFFSET $3
+     ) recent_messages
+     ORDER BY created_at ASC`,
     [bookingId, limit, offset],
   );
 }

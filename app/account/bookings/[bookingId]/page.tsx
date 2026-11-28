@@ -6,9 +6,10 @@ import { notFound } from "next/navigation";
 import { useApi } from "@/lib/hooks/use-api";
 import { PublicBooking } from "@/lib/types/public";
 import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
+import { formatDhakaDate, formatDhakaTime } from "@/lib/utils/dhaka-time";
 
 function formatDate(value: string | Date) {
-  return new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  return formatDhakaDate(value);
 }
 
 export default function AccountBookingDetailPage({ params }: { params: Promise<{ bookingId: string }> }) {
@@ -52,10 +53,10 @@ export default function AccountBookingDetailPage({ params }: { params: Promise<{
         <dl className="mt-5 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <div><dt className="text-[10px] uppercase tracking-wider text-muted">Photographer service</dt><dd className="mt-1">{booking.photography_type || "Not specified"}</dd></div>
           <div><dt className="text-[10px] uppercase tracking-wider text-muted">Date</dt><dd className="mt-1">{formatDate(booking.booking_date)}</dd></div>
-          <div><dt className="text-[10px] uppercase tracking-wider text-muted">Time</dt><dd className="mt-1">{String(booking.start_time).slice(0, 5)}–{String(booking.end_time).slice(0, 5)}</dd></div>
+          <div><dt className="text-[10px] uppercase tracking-wider text-muted">Time · Dhaka</dt><dd className="mt-1">{formatDhakaTime(booking.start_time)}–{formatDhakaTime(booking.end_time)}</dd></div>
           <div><dt className="text-[10px] uppercase tracking-wider text-muted">Location</dt><dd className="mt-1">{booking.location || "To be arranged"}</dd></div>
           <div><dt className="text-[10px] uppercase tracking-wider text-muted">Proposed budget</dt><dd className="mt-1">{booking.budget == null ? "Not specified" : `BDT ${Number(booking.budget).toLocaleString()}`}</dd></div>
-          <div><dt className="text-[10px] uppercase tracking-wider text-muted">Requested</dt><dd className="mt-1">{new Date(booking.created_at).toLocaleDateString()}</dd></div>
+          <div><dt className="text-[10px] uppercase tracking-wider text-muted">Requested</dt><dd className="mt-1">{formatDhakaDate(booking.created_at, { dateStyle: "medium" })}</dd></div>
         </dl>
         <div className="mt-5 border-t line-border pt-4"><p className="text-[10px] uppercase tracking-wider text-muted">Your message</p><p className="mt-2 whitespace-pre-wrap text-sm">{booking.description}</p></div>
       </section>
