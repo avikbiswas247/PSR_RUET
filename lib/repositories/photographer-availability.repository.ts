@@ -29,10 +29,10 @@ export function createAvailability(input: {
     [input.photographer_id, input.available_date, input.start_time, input.end_time, input.is_available ?? true],
   );
 }
-export function setAvailability(id: string, isAvailable: boolean) {
+export function setAvailability(id: string, photographerId: string, isAvailable: boolean) {
   return one<PhotographerAvailability>(
-    "UPDATE photographer_availability SET is_available = $1 WHERE id = $2 RETURNING *",
-    [isAvailable, id],
+    "UPDATE photographer_availability SET is_available = $1 WHERE id = $2 AND photographer_id = $3 RETURNING *",
+    [isAvailable, id, photographerId],
   );
 }
 export function deleteAvailability(id: string) { return run("DELETE FROM photographer_availability WHERE id = $1", [id]); }

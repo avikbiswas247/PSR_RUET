@@ -4,6 +4,18 @@ import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import { PhotographerProfileMe, PublicBooking, PublicPhoto, PublicPortfolio } from "@/lib/types/public";
+
+interface AvailabilitySlot {
+  id: string;
+  available_date: string | Date;
+  start_time: string | Date;
+  end_time: string | Date;
+  is_available: boolean;
+}
+
+function localDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 export default function PhotographerDashboardPage() {
   const { data: profile, loading: profileLoading, error: profileError } =
     useApi<PhotographerProfileMe | null>("/api/photographers/me");
@@ -16,6 +28,12 @@ export default function PhotographerDashboardPage() {
   const { data: bookings, loading: bookingsLoading } = useApi<
     PublicBooking[] | null
   >("/api/bookings");
+  const availabilityEnd = new Date();
+  availabilityEnd.setDate(availabilityEnd.getDate() + 30);
+  const availabilityUrl = profile?.user_id
+    ? `/api/availability?photographerId=${profile.user_id}&from=${localDateString(new Date())}&to=${localDateString(availabilityEnd)}`
+    : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
+  const { data: availability } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
 
   const loading =
     profileLoading || portfoliosLoading || photosLoading || bookingsLoading;
@@ -93,6 +111,28 @@ export default function PhotographerDashboardPage() {
           <p className="text-[32px] font-bold text-orange">{pendingCount}</p>
         </div>
       </div>
+
+      <section className="rounded-sm border line-border bg-surface p-5">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold">Upcoming availability</h2>
+            <p className="mt-1 text-xs text-muted">Available times clients can request over the next 30 days.</p>
+          </div>
+          <Link href="/photographer/availability" className="text-xs font-bold text-orange hover:underline">Manage slots</Link>
+        </div>
+        {(availability ?? []).filter((slot) => slot.is_available).length === 0 ? (
+          <p className="text-sm text-muted">No upcoming slots are open for booking.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(availability ?? []).filter((slot) => slot.is_available).slice(0, 6).map((slot) => (
+              <div key={slot.id} className="rounded-sm border line-border bg-bg p-3">
+                <p className="text-sm font-semibold">{new Date(`${String(slot.available_date).slice(0, 10)}T00:00:00`).toLocaleDateString()}</p>
+                <p className="mt-1 text-xs text-muted">{String(slot.start_time).slice(0, 5)} – {String(slot.end_time).slice(0, 5)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

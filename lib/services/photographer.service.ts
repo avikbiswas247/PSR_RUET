@@ -76,7 +76,8 @@ export async function listPublicPhotographers(input: { limit?: number; offset?: 
 }
 
 export async function getPublicPhotographer(id: string) {
-  const profile = await PhotographerProfileRepo.getPhotographerProfileById(id);
+  const profile = await PhotographerProfileRepo.getPhotographerProfileById(id)
+    ?? await PhotographerProfileRepo.getPhotographerProfileByUserId(id);
   if (!profile) return null;
   let user: { full_name: string | null; avatar_url: string | null } | null = null;
   if (profile.user_id) {

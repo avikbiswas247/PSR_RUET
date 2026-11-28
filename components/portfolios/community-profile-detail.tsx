@@ -9,6 +9,18 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useApi } from "@/lib/hooks/use-api";
 import type { CommunityProfileDetail, CommunityProfilePhoto } from "@/lib/types/public";
 
+interface AvailabilitySlot {
+  id: string;
+  available_date: string | Date;
+  start_time: string | Date;
+  end_time: string | Date;
+  is_available: boolean;
+}
+
+function localDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrator",
   MEMBER: "Member",
@@ -70,6 +82,11 @@ function PhotoLightbox({ photo, onClose }: { photo: CommunityProfilePhoto; onClo
 
 export function CommunityProfileDetail({ userId }: { userId: string }) {
   const { data: profile, loading, error } = useApi<CommunityProfileDetail>(`/api/portfolios/profiles/${userId}`);
+  const availabilityEnd = new Date();
+  availabilityEnd.setDate(availabilityEnd.getDate() + 30);
+  const availabilityUrl = `/api/availability?photographerId=${userId}&from=${localDateString(new Date())}&to=${localDateString(availabilityEnd)}`;
+  const { data: availability } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
+  const openSlots = profile?.is_available ? (availability ?? []).filter((slot) => slot.is_available) : [];
   const [activePhoto, setActivePhoto] = useState<CommunityProfilePhoto | null>(null);
   const [avatarFailed, setAvatarFailed] = useState(false);
 
@@ -174,6 +191,30 @@ export function CommunityProfileDetail({ userId }: { userId: string }) {
             )}
           </div>
         </section>
+
+        {profile.roles.includes("PHOTOGRAPHER") && (
+          <section className="mt-8 rounded-2xl border line-border bg-surface p-5 sm:p-7">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-orange">Booking calendar</p>
+                <h2 className="text-xl font-semibold text-text">Upcoming availability</h2>
+              </div>
+              <Link href={`/book/${profile.id}`} className="rounded-lg bg-orange px-4 py-2 text-sm font-bold text-[#14110f] transition hover:bg-orange-deep">Book a session</Link>
+            </div>
+            {openSlots.length === 0 ? (
+              <p className="text-sm text-muted">No open booking slots are listed right now.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {openSlots.slice(0, 6).map((slot) => (
+                  <div key={slot.id} className="rounded-xl border line-border bg-surface-2 p-3">
+                    <p className="text-sm font-semibold text-text">{new Date(`${String(slot.available_date).slice(0, 10)}T00:00:00`).toLocaleDateString()}</p>
+                    <p className="mt-1 text-xs text-muted">{String(slot.start_time).slice(0, 5)} – {String(slot.end_time).slice(0, 5)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="mt-10 sm:mt-14">
           <div className="mb-5 flex items-end justify-between gap-4">

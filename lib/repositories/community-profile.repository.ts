@@ -16,6 +16,7 @@ const PROFILE_SELECT = `
       ORDER BY r.name
     ) AS roles,
     pp.title,
+    pp.is_available,
     pp.bio,
     pp.location,
     pp.instagram_url,
@@ -27,7 +28,7 @@ const PROFILE_SELECT = `
     (SELECT COUNT(*)::int FROM portfolios po WHERE po.photographer_id = u.id AND po.is_public = TRUE) AS portfolio_count
   FROM users u
   LEFT JOIN LATERAL (
-    SELECT title, bio, location, instagram_url, website_url, device, photography_genre
+    SELECT title, is_available, bio, location, instagram_url, website_url, device, photography_genre
     FROM photographer_profiles
     WHERE user_id = u.id
     ORDER BY created_at ASC

@@ -16,16 +16,23 @@ interface AvailabilitySlot {
   is_available: boolean;
 }
 
-const today = new Date().toISOString().slice(0, 10);
-const plus90 = new Date(Date.now() + 86400000 * 90).toISOString().slice(0, 10);
+function toLocalDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+const today = toLocalDate(new Date());
+const plus90Date = new Date();
+plus90Date.setDate(plus90Date.getDate() + 90);
+const plus90 = toLocalDate(plus90Date);
 
 export default function PhotographerAvailabilityPage() {
   const { data: profile, loading: profileLoading } = useApi<PhotographerProfileMe | null>(
     "/api/photographers/me"
   );
+  const [refreshKey, setRefreshKey] = useState(0);
   const url = profile?.user_id
-    ? `/api/availability?photographerId=${profile.user_id}&from=${today}&to=${plus90}`
-    : "/api/availability?photographerId=none&from=2026-01-01&to=2026-01-02";
+    ? `/api/availability?photographerId=${profile.user_id}&from=${today}&to=${plus90}&refresh=${refreshKey}`
+    : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
   const { data: slots, loading: slotsLoading, error } = useApi<
     AvailabilitySlot[] | null
   >(url);
@@ -34,6 +41,7 @@ export default function PhotographerAvailabilityPage() {
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [slotBusy, setSlotBusy] = useState<string | null>(null);
 
   const photographerId = profile?.user_id;
   const slotsList = slotsLoading ? [] : (slots ?? []);
@@ -58,6 +66,7 @@ export default function PhotographerAvailabilityPage() {
         if (!res.ok) throw new Error(json.message || "Unable to add slot.");
         setCreateNotice("Availability slot added.");
         setDate(""); setStartTime(""); setEndTime("");
+        setRefreshKey((current) => current + 1);
       } catch (err) {
         setCreateNotice(err instanceof Error ? err.message : "Please try again.");
       } finally {
@@ -66,6 +75,26 @@ export default function PhotographerAvailabilityPage() {
     },
     [date, startTime, endTime, photographerId]
   );
+
+  const toggleSlot = async (slot: AvailabilitySlot) => {
+    setSlotBusy(slot.id);
+    setCreateNotice("");
+    try {
+      const response = await fetch(`/api/availability/${slot.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ available: !slot.is_available }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Unable to update availability.");
+      setCreateNotice("Availability slot updated.");
+      setRefreshKey((current) => current + 1);
+    } catch (err) {
+      setCreateNotice(err instanceof Error ? err.message : "Unable to update availability.");
+    } finally {
+      setSlotBusy(null);
+    }
+  };
 
   if (profileLoading || slotsLoading) {
     return (
@@ -129,12 +158,15 @@ export default function PhotographerAvailabilityPage() {
           slotsList.map((s) => (
             <div key={s.id} className="border line-border rounded-sm p-4">
               <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="text-sm font-bold">{new Date(s.available_date).toLocaleDateString()}</h3>
+                <h3 className="text-sm font-bold">{new Date(`${String(s.available_date).slice(0, 10)}T00:00:00`).toLocaleDateString()}</h3>
                 <span className={`text-[10px] uppercase tracking-wider font-bold border rounded px-2 py-0.5 ${s.is_available ? "text-orange bg-orange/10 border border-orange/20" : "text-muted border-line-border bg-transparent"}`}>
                   {s.is_available ? "Available" : "Unavailable"}
                 </span>
               </div>
-              <p className="text-muted text-sm">{String(s.start_time)} &ndash; {String(s.end_time)}</p>
+              <p className="text-muted text-sm">{String(s.start_time).slice(0, 5)} &ndash; {String(s.end_time).slice(0, 5)}</p>
+              <Button type="button" variant="outline" disabled={slotBusy === s.id} onClick={() => toggleSlot(s)} className="mt-3">
+                {slotBusy === s.id ? "Updating…" : s.is_available ? "Mark unavailable" : "Mark available"}
+              </Button>
             </div>
           ))
         )}

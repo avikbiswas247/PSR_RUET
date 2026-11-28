@@ -4,11 +4,14 @@ import * as MessageRepo from "@/lib/repositories/booking-message.repository";
 import * as PaymentRepo from "@/lib/repositories/booking-payment.repository";
 import * as NotificationRepo from "@/lib/repositories/notification.repository";
 import * as UserRepo from "@/lib/repositories/user.repository";
+import * as PhotographerProfileRepo from "@/lib/repositories/photographer-profile.repository";
 export class BookingServiceError extends Error { constructor(message: string, public code: string) { super(message); this.name = "BookingServiceError"; } }
 export async function requestBooking(i: { authenticatedClientId: string; photographerId: string; title: string; description?: string|null; photographyType?: string|null; location?: string|null; bookingDate: string; startTime: string; endTime: string; budget?: number|null; bookingNumber: string }) {
   if (!i.title.trim()) throw new BookingServiceError("Title is required.","INVALID_TITLE");
   if (i.endTime <= i.startTime) throw new BookingServiceError("End time must be later than start time.","INVALID_TIME");
   if (i.budget != null && (!Number.isFinite(i.budget)||i.budget<0)) throw new BookingServiceError("Budget cannot be negative.","INVALID_BUDGET");
+  const profile = await PhotographerProfileRepo.getPhotographerProfileByUserId(i.photographerId);
+  if (!profile || !profile.is_available) throw new BookingServiceError("Photographer is not accepting bookings.","PHOTOGRAPHER_UNAVAILABLE");
   const slot=await AvailabilityRepo.findAvailableSlot(i.photographerId,i.bookingDate,i.startTime,i.endTime);
   if(!slot) throw new BookingServiceError("Photographer has no matching available slot.","SLOT_UNAVAILABLE");
   const booking = await BookingRepo.createBooking({booking_number:i.bookingNumber,client_id:i.authenticatedClientId,photographer_id:i.photographerId,title:i.title.trim(),description:i.description??null,photography_type:i.photographyType??null,location:i.location??null,booking_date:i.bookingDate,start_time:i.startTime,end_time:i.endTime,budget:i.budget??null,status:"PENDING"});

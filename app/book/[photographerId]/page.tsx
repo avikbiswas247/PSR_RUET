@@ -31,6 +31,10 @@ interface CalendarDate {
   availableSlots: AvailabilitySlot[];
 }
 
+function localDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 export default function BookPhotographerPage({
   params,
 }: {
@@ -40,25 +44,28 @@ export default function BookPhotographerPage({
   const { photographerId } = use(params);
   const submitRef = useRef(false);
 
-  const [fromDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [toDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [fromDate] = useState(() => localDateString(new Date()));
+  const [toDate] = useState(() => {
+    const end = new Date();
+    end.setDate(end.getDate() + 90);
+    return localDateString(end);
+  });
 
   const { data: photographer, loading: photoLoading, error: photoError } =
     useApi<PublicPhotographer | null>(`/api/photographers/${photographerId}`);
+  const availabilityUrl = photographer?.user_id
+    ? `/api/availability?photographerId=${photographer.user_id}&from=${fromDate}&to=${toDate}`
+    : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
   const { data: slotsData, loading: slotsLoading, error: slotsError } = useApi<
     AvailabilitySlot[] | null
-  >(
-    `/api/availability?photographerId=${photographerId}&from=${fromDate}&to=${toDate}`
-  );
+  >(availabilityUrl);
 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState<"error" | "success">("error");
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  );
+  const [calendarMonth, setCalendarMonth] = useState(() => localDateString(new Date()).slice(0, 7));
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -67,12 +74,12 @@ export default function BookPhotographerPage({
 
   const allSlots = useMemo(() => slotsLoading ? [] : (slotsData ?? []), [slotsData, slotsLoading]);
   const availableSlots = useMemo(
-    () => allSlots.filter((s) => s.is_available),
-    [allSlots]
+    () => allSlots.filter((s) => s.is_available && photographer?.is_available),
+    [allSlots, photographer?.is_available]
   );
   const slotsForSelectedDate = useMemo(
-    () => (selectedDate ? allSlots.filter((s) => s.available_date === selectedDate && s.is_available) : []),
-    [allSlots, selectedDate]
+    () => (selectedDate ? allSlots.filter((s) => s.available_date === selectedDate && s.is_available && photographer?.is_available) : []),
+    [allSlots, selectedDate, photographer?.is_available]
   );
 
   const hasAvailability = availableSlots.length > 0;
@@ -84,12 +91,12 @@ export default function BookPhotographerPage({
 
   const daysInMonth = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
   const firstDayOfMonth = useMemo(() => new Date(year, month - 1, 1).getDay(), [year, month]);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = localDateString(new Date());
 
   const availableDatesSet = useMemo(() => {
     const set = new Set<string>();
     for (const s of allSlots) {
-      set.add(s.available_date);
+      if (s.is_available) set.add(s.available_date);
     }
     return set;
   }, [allSlots]);
@@ -175,7 +182,7 @@ export default function BookPhotographerPage({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          photographerId,
+          photographerId: photographer?.user_id ?? photographerId,
           bookingNumber: generatedBookingNumber,
           title: formData.title || "Photography Session",
           description: formData.description || undefined,

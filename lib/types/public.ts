@@ -36,6 +36,7 @@ export interface CommunityProfile {
   avatar_url: string | null;
   roles: string[];
   title: string | null;
+  is_available: boolean | null;
   bio: string | null;
   location: string | null;
   instagram_url: string | null;

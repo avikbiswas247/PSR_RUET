@@ -12,7 +12,6 @@ export async function PATCH(request: Request, context: Context) {
     const { slotId } = await context.params;
     const body = await readJson<Body>(request);
     if (typeof body.available !== "boolean") return jsonOk({ message: "available must be boolean." }, 422);
-    // IMPORTANT: add an ownership check in the service/repository before production.
-    return jsonOk(await AvailabilityService.setSlotAvailability(slotId, body.available));
+    return jsonOk(await AvailabilityService.setSlotAvailability(slotId, auth.id, body.available));
   } catch (error) { return handleApiError(error); }
 }
