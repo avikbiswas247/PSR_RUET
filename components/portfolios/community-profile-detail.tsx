@@ -85,7 +85,7 @@ export function CommunityProfileDetail({ userId }: { userId: string }) {
   const availabilityEnd = new Date();
   availabilityEnd.setDate(availabilityEnd.getDate() + 90);
   const availabilityUrl = `/api/availability?photographerId=${userId}&from=${localDateString(new Date())}&to=${localDateString(availabilityEnd)}`;
-  const { data: availability } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
+  const { data: availability, loading: availabilityLoading } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
   const openSlots = (availability ?? []).filter((slot) => slot.is_available);
   const [activePhoto, setActivePhoto] = useState<CommunityProfilePhoto | null>(null);
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -124,6 +124,10 @@ export function CommunityProfileDetail({ userId }: { userId: string }) {
   const joined = displayDate(profile.created_at);
   const instagramUrl = safeHttpUrl(profile.instagram_url);
   const websiteUrl = safeHttpUrl(profile.website_url);
+  const canBook = profile.roles.includes("PHOTOGRAPHER")
+    && profile.is_available === true
+    && !availabilityLoading
+    && openSlots.length > 0;
 
   return (
     <PageContainer className="section-pad">
@@ -199,7 +203,7 @@ export function CommunityProfileDetail({ userId }: { userId: string }) {
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-orange">Booking calendar</p>
                 <h2 className="text-xl font-semibold text-text">Upcoming availability</h2>
               </div>
-              <Link href={`/book/${profile.id}`} className="rounded-lg bg-orange px-4 py-2 text-sm font-bold text-[#14110f] transition hover:bg-orange-deep">Book a session</Link>
+              {canBook && <Link href={`/book/${profile.id}`} className="rounded-lg bg-orange px-4 py-2 text-sm font-bold text-[#14110f] transition hover:bg-orange-deep">Book a session</Link>}
             </div>
             {openSlots.length === 0 ? (
               <p className="text-sm text-muted">No open booking slots are listed right now.</p>

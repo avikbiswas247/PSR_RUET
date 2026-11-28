@@ -110,7 +110,7 @@ export default function PhotographerProfilePage() {
       if (genre !== null) body.photographyGenre = genre;
       if (instagramUrl !== null) body.instagramUrl = instagramUrl;
       if (websiteUrl !== null) body.websiteUrl = websiteUrl;
-      if (isAvailable !== null) body.isAvailable = isAvailable === "on";
+      body.isAvailable = isAvailable === "on";
       try {
         if (body.fullName !== undefined) {
           const res = await fetch("/api/users/me", {

@@ -43,6 +43,7 @@ export default function PhotographerDetailPage({
     : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
   const { data: slots } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
   const openSlots = photographer?.is_available ? (slots ?? []).filter((slot) => slot.is_available) : [];
+  const canBook = openSlots.length > 0;
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followBusy, setFollowBusy] = useState(false);
@@ -232,7 +233,7 @@ export default function PhotographerDetailPage({
                   ) : (
                     <Link href="/sign-in" className="rounded-lg bg-orange px-4 py-2 text-sm font-bold text-[#14110f] transition hover:bg-orange-deep">Sign in to follow</Link>
                   )}
-                  <Link href={`/book/${photographerId}`} className="rounded-lg border border-line-border bg-surface-2 px-4 py-2 text-sm font-semibold text-text transition hover:bg-surface-3">Book a session</Link>
+                  {canBook && <Link href={`/book/${photographerId}`} className="rounded-lg border border-line-border bg-surface-2 px-4 py-2 text-sm font-semibold text-text transition hover:bg-surface-3">Book a session</Link>}
                 </div>
               )}
             </div>
@@ -302,7 +303,7 @@ export default function PhotographerDetailPage({
               <h2 className="text-lg font-bold">Upcoming availability</h2>
               <p className="mt-1 text-xs text-muted">Open booking slots in the next 90 days.</p>
             </div>
-            <Link href={`/book/${photographerId}`} className="text-xs font-bold text-orange hover:underline">Book a session</Link>
+            {canBook && <Link href={`/book/${photographerId}`} className="text-xs font-bold text-orange hover:underline">Book a session</Link>}
           </div>
           {openSlots.length === 0 ? (
             <p className="text-sm text-muted">No open slots are listed right now. Check back later.</p>

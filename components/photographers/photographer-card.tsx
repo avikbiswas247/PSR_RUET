@@ -101,7 +101,7 @@ export function PhotographerCard({
           )}
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {showBookButton && canBook && (
+          {showBookButton && canBook && is_available && (
             <Link
               href={`/book/${id}`}
               className="flex-1 button button-primary text-sm py-2 text-center"
@@ -109,7 +109,7 @@ export function PhotographerCard({
               Book a Session
             </Link>
           )}
-          {showBookButton && !canBook && !isClient && (
+          {showBookButton && is_available && !canBook && !isClient && (
             <Link
               href="/sign-in"
               className="flex-1 button button-outline text-sm py-2 text-center"

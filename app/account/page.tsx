@@ -206,12 +206,12 @@ export default function AccountDashboardPage() {
                   {p.bio && (
                     <p className="text-sm text-gray-400 line-clamp-2 mb-3">{p.bio}</p>
                   )}
-                  <Link
+                  {p.is_available && <Link
                     href={`/book/${p.id}`}
                     className="button button-primary w-full py-2 text-sm"
                   >
                     Book a Session
-                  </Link>
+                  </Link>}
                 </div>
               </div>
             ))

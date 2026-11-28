@@ -44,9 +44,9 @@ export async function POST(request: Request) {
     if (validationErrors) {
       return jsonError("Validation failed.", 400, "VALIDATION_ERROR", validationErrors);
     }
-    const existing = await ProfileService.getMyPhotographerProfile(auth.id);
+    const existing = await ProfileService.findPhotographerProfileByUserId(auth.id);
     if (existing) {
-      return jsonOk(await ProfileService.updatePhotographerProfile({
+      const updated = await ProfileService.updatePhotographerProfile({
         profileId: existing.id,
         patch: profileBody as {
           title?: string | null;
@@ -58,7 +58,9 @@ export async function POST(request: Request) {
           photographyGenre?: string | null;
           isAvailable?: boolean;
         },
-      }));
+      });
+      if (!updated) return jsonError("Photographer profile could not be updated.", 404, "PROFILE_NOT_FOUND");
+      return jsonOk(updated);
     }
     return jsonOk(await ProfileService.createPhotographerProfile({
       userId: auth.id,
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
         location?: string | null;
         instagramUrl?: string | null;
         websiteUrl?: string | null;
+        isAvailable?: boolean;
         device?: string | null;
         photographyGenre?: string | null;
       }),
@@ -86,11 +89,11 @@ export async function PATCH(request: Request) {
     if (validationErrors) {
       return jsonError("Validation failed.", 400, "VALIDATION_ERROR", validationErrors);
     }
-    const existing = await ProfileService.getMyPhotographerProfile(auth.id);
+    const existing = await ProfileService.findPhotographerProfileByUserId(auth.id);
     if (!existing) {
-      return jsonOk({ message: "Photographer profile not found. Create one first." }, 404);
+      return jsonError("Photographer profile not found. Create one first.", 404, "PROFILE_NOT_FOUND");
     }
-    return jsonOk(await ProfileService.updatePhotographerProfile({
+    const updated = await ProfileService.updatePhotographerProfile({
       profileId: existing.id,
       patch: profileBody as {
         title?: string | null;
@@ -102,6 +105,8 @@ export async function PATCH(request: Request) {
         photographyGenre?: string | null;
         isAvailable?: boolean;
       },
-    }));
+    });
+    if (!updated) return jsonError("Photographer profile could not be updated.", 404, "PROFILE_NOT_FOUND");
+    return jsonOk(updated);
   } catch (error) { return handleApiError(error); }
 }
