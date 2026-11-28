@@ -1,10 +1,9 @@
 import { BookingService } from "@/lib/services";
 import { requireUser, requireRole, isResponse } from "@/lib/api/guards";
-import { getPagination, jsonError, jsonOk, readJson } from "@/lib/api/http";
-import { handleBookingApiError } from "@/lib/api/booking-http";
+import { getPagination, jsonError, jsonOk } from "@/lib/api/http";
+import { BOOKING_UUID_REGEX, handleBookingApiError, readBookingJson } from "@/lib/api/booking-http";
 
 type Body = { photographerId?: string; title?: string; description?: string | null; photographyType?: string | null; location?: string | null; bookingDate?: string; startTime?: string; endTime?: string; budget?: number | null; bookingNumber?: string };
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(request: Request) {
   try {
@@ -25,13 +24,16 @@ export async function POST(request: Request) {
   try {
     const auth = await requireUser(); if (isResponse(auth)) return auth;
     const denied = requireRole(auth, "CLIENT"); if (denied) return denied;
-    const body = await readJson<Body>(request);
-    if (typeof body.photographerId !== "string" || !UUID_REGEX.test(body.photographerId)
+    const body = await readBookingJson<Body>(request);
+    if (typeof body.photographerId !== "string"
       || typeof body.title !== "string" || typeof body.description !== "string" || !body.description.trim()
       || typeof body.bookingDate !== "string" || typeof body.startTime !== "string" || typeof body.endTime !== "string"
       || (body.photographyType != null && typeof body.photographyType !== "string")
       || (body.location != null && typeof body.location !== "string")) {
       return jsonError("photographerId, title, booking message, bookingDate, startTime and endTime are required.", 422, "MISSING_FIELDS");
+    }
+    if (!BOOKING_UUID_REGEX.test(body.photographerId)) {
+      return jsonError("Invalid photographer ID.", 422, "INVALID_PHOTOGRAPHER_ID");
     }
     if (body.budget !== undefined && body.budget !== null && (typeof body.budget !== "number" || !Number.isFinite(body.budget))) {
       return jsonError("Budget must be a valid number.", 422, "INVALID_BUDGET");

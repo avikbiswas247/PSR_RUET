@@ -1,7 +1,23 @@
 import { BookingServiceError } from "@/lib/services/booking.service";
 import { jsonError } from "@/lib/api/http";
 
+export const BOOKING_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function readBookingJson<T>(request: Request): Promise<T> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw new BookingServiceError("Request body must be valid JSON.", "INVALID_REQUEST");
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new BookingServiceError("Request body must be a JSON object.", "INVALID_REQUEST");
+  }
+  return body as T;
+}
+
 const STATUS_BY_CODE: Record<string, number> = {
+  INVALID_REQUEST: 400,
   NOT_FOUND: 404,
   FORBIDDEN: 403,
   SLOT_UNAVAILABLE: 409,

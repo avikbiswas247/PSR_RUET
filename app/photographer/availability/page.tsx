@@ -88,9 +88,11 @@ export default function PhotographerAvailabilityPage() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error?.message || result.message || "Unable to update availability.");
-      if (result.data?.id) {
-        setLocalSlots((current) => [...current.filter((item) => item.id !== result.data.id), result.data as AvailabilitySlot]);
+      const updatedSlot = result.data as AvailabilitySlot | null | undefined;
+      if (!updatedSlot?.id || updatedSlot.id !== slot.id || updatedSlot.photographer_id !== photographerId) {
+        throw new Error("The server did not confirm that this slot was updated. Refresh and try again.");
       }
+      setLocalSlots((current) => [...current.filter((item) => item.id !== updatedSlot.id), updatedSlot]);
       setCreateNotice("Availability slot updated.");
       setRefreshKey((current) => current + 1);
     } catch (err) {

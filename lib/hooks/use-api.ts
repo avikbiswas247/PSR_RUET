@@ -23,8 +23,16 @@ export function useApi<T>(url: string): ApiState<T> {
       try {
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.message || `Request failed with status ${res.status}`);
+          const errData: unknown = await res.json().catch(() => ({}));
+          const payload = errData && typeof errData === "object"
+            ? errData as { message?: unknown; error?: { message?: unknown } }
+            : {};
+          const message = typeof payload.error?.message === "string"
+            ? payload.error.message
+            : typeof payload.message === "string"
+              ? payload.message
+              : `Request failed with status ${res.status}`;
+          throw new Error(message);
         }
         const json = await res.json();
         if (!cancelled) {
