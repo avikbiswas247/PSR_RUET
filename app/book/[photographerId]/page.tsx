@@ -74,12 +74,12 @@ export default function BookPhotographerPage({
 
   const allSlots = useMemo(() => slotsLoading ? [] : (slotsData ?? []), [slotsData, slotsLoading]);
   const availableSlots = useMemo(
-    () => allSlots.filter((s) => s.is_available && photographer?.is_available),
-    [allSlots, photographer?.is_available]
+    () => allSlots.filter((s) => s.is_available),
+    [allSlots]
   );
   const slotsForSelectedDate = useMemo(
-    () => (selectedDate ? allSlots.filter((s) => s.available_date === selectedDate && s.is_available && photographer?.is_available) : []),
-    [allSlots, selectedDate, photographer?.is_available]
+    () => (selectedDate ? allSlots.filter((s) => s.available_date === selectedDate && s.is_available) : []),
+    [allSlots, selectedDate]
   );
 
   const hasAvailability = availableSlots.length > 0;

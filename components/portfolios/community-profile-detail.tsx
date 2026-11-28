@@ -83,10 +83,10 @@ function PhotoLightbox({ photo, onClose }: { photo: CommunityProfilePhoto; onClo
 export function CommunityProfileDetail({ userId }: { userId: string }) {
   const { data: profile, loading, error } = useApi<CommunityProfileDetail>(`/api/portfolios/profiles/${userId}`);
   const availabilityEnd = new Date();
-  availabilityEnd.setDate(availabilityEnd.getDate() + 30);
+  availabilityEnd.setDate(availabilityEnd.getDate() + 90);
   const availabilityUrl = `/api/availability?photographerId=${userId}&from=${localDateString(new Date())}&to=${localDateString(availabilityEnd)}`;
   const { data: availability } = useApi<AvailabilitySlot[] | null>(availabilityUrl);
-  const openSlots = profile?.is_available ? (availability ?? []).filter((slot) => slot.is_available) : [];
+  const openSlots = (availability ?? []).filter((slot) => slot.is_available);
   const [activePhoto, setActivePhoto] = useState<CommunityProfilePhoto | null>(null);
   const [avatarFailed, setAvatarFailed] = useState(false);
 

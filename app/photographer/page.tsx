@@ -29,7 +29,7 @@ export default function PhotographerDashboardPage() {
     PublicBooking[] | null
   >("/api/bookings");
   const availabilityEnd = new Date();
-  availabilityEnd.setDate(availabilityEnd.getDate() + 30);
+  availabilityEnd.setDate(availabilityEnd.getDate() + 90);
   const availabilityUrl = profile?.user_id
     ? `/api/availability?photographerId=${profile.user_id}&from=${localDateString(new Date())}&to=${localDateString(availabilityEnd)}`
     : "/api/availability?photographerId=00000000-0000-0000-0000-000000000000&from=2026-01-01&to=2026-01-02";
@@ -116,7 +116,7 @@ export default function PhotographerDashboardPage() {
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold">Upcoming availability</h2>
-            <p className="mt-1 text-xs text-muted">Available times clients can request over the next 30 days.</p>
+            <p className="mt-1 text-xs text-muted">Available times clients can request over the next 90 days.</p>
           </div>
           <Link href="/photographer/availability" className="text-xs font-bold text-orange hover:underline">Manage slots</Link>
         </div>

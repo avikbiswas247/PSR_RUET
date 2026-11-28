@@ -42,9 +42,13 @@ export default function PhotographerAvailabilityPage() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [slotBusy, setSlotBusy] = useState<string | null>(null);
+  const [localSlots, setLocalSlots] = useState<AvailabilitySlot[]>([]);
 
   const photographerId = profile?.user_id;
-  const slotsList = slotsLoading ? [] : (slots ?? []);
+  const slotsList = slotsLoading
+    ? []
+    : Array.from(new Map<string, AvailabilitySlot>([...(slots ?? []), ...localSlots].map((slot): [string, AvailabilitySlot] => [slot.id, slot])).values())
+        .sort((a, b) => `${String(a.available_date).slice(0, 10)}${String(a.start_time)}`.localeCompare(`${String(b.available_date).slice(0, 10)}${String(b.start_time)}`));
 
   const handleCreate = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -63,8 +67,13 @@ export default function PhotographerAvailabilityPage() {
           body: JSON.stringify({ date, startTime, endTime }),
         });
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json.message || "Unable to add slot.");
-        setCreateNotice("Availability slot added.");
+        if (!res.ok) throw new Error(json.error?.message || json.message || "Unable to add slot.");
+        const createdSlot = json.data as AvailabilitySlot | null | undefined;
+        if (!createdSlot?.id || createdSlot.photographer_id !== photographerId) {
+          throw new Error("The server did not confirm that this slot was saved. Refresh and try again.");
+        }
+        setLocalSlots((current) => [...current.filter((slot) => slot.id !== createdSlot.id), createdSlot]);
+        setCreateNotice("Slot added to your availability.");
         setDate(""); setStartTime(""); setEndTime("");
         setRefreshKey((current) => current + 1);
       } catch (err) {
@@ -86,7 +95,10 @@ export default function PhotographerAvailabilityPage() {
         body: JSON.stringify({ available: !slot.is_available }),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || "Unable to update availability.");
+      if (!response.ok) throw new Error(result.error?.message || result.message || "Unable to update availability.");
+      if (result.data?.id) {
+        setLocalSlots((current) => [...current.filter((item) => item.id !== result.data.id), result.data as AvailabilitySlot]);
+      }
       setCreateNotice("Availability slot updated.");
       setRefreshKey((current) => current + 1);
     } catch (err) {
@@ -137,7 +149,7 @@ export default function PhotographerAvailabilityPage() {
       <div className="p-6 rounded-sm border line-border bg-surface space-y-4">
         <h2 className="text-lg font-bold mb-3">Add availability slot</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Input label="Date" type="date" name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <Input label="Date" type="date" name="date" min={today} max={plus90} value={date} onChange={(e) => setDate(e.target.value)} required />
           <Input label="Start time" type="time" name="startTime" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
           <Input label="End time" type="time" name="endTime" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
           <div className="sm:col-span-3">
