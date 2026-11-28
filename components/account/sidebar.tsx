@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { BrandLogo } from "@/components/layout/brand-logo";
@@ -17,12 +17,10 @@ export function AccountSidebar({
 }) {
   const { user, signOut } = useAuth();
   const router = useRouter();
-
-  // Active item derived from client-side location during render. During SSR
-  // `window` is undefined so the passed-in `active` prop is used (avoids the
-  // usePathname hook, which blocks prerendering under cacheComponents: true).
-  const href = typeof window !== "undefined" ? window.location.pathname : "";
-  const clientActive = items.find((i) => href === i.href)?.key ?? active;
+  const pathname = usePathname();
+  const clientActive = items.find(
+    (item) => pathname === item.href || (item.href !== "/account" && pathname.startsWith(`${item.href}/`))
+  )?.key ?? active;
 
   const handleSignOut = async () => {
     await signOut();
@@ -42,6 +40,7 @@ export function AccountSidebar({
           <Link
             key={item.key}
             href={item.href}
+            aria-current={clientActive === item.key ? "page" : undefined}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm transition-colors ${
               clientActive === item.key
                 ? "bg-orange/10 text-orange font-bold border-r-2 border-orange"

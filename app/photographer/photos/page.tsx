@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -14,6 +14,8 @@ export default function PhotographerPhotosPage() {
   const [uploadNotice, setUploadNotice] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState("");
   const [modalAlt, setModalAlt] = useState("");
@@ -54,8 +56,7 @@ export default function PhotographerPhotosPage() {
     e.preventDefault();
     setUploadBusy(true);
     setUploadNotice("");
-    const form = new FormData(e.currentTarget);
-    const file = form.get("file") as File;
+    const file = selectedFile;
     if (!file) {
       setUploadNotice("Please select an image file.");
       setUploadBusy(false);
@@ -81,7 +82,8 @@ export default function PhotographerPhotosPage() {
       setUploadNotice("Photo uploaded and published.");
       setTitle("");
       setDescription("");
-      e.currentTarget.reset();
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       window.dispatchEvent(new Event("photos:updated"));
     } catch (err) {
       setUploadNotice(err instanceof Error ? err.message : "Please try again.");
@@ -151,7 +153,7 @@ export default function PhotographerPhotosPage() {
             the Portfolios section.
           </p>
         </div>
-        <Button onClick={() => document.getElementById("file-input")?.click()} variant="outline">
+        <Button onClick={() => fileInputRef.current?.click()} variant="outline">
           Upload photo
         </Button>
       </div>
@@ -176,18 +178,21 @@ export default function PhotographerPhotosPage() {
               placeholder="Description"
             />
           </div>
-          <div className="border-2 border-dashed border-line-border rounded-lg p-6 flex flex-col items-center justify-center hover:border-orange/50 transition-colors cursor-pointer" onClick={() => document.getElementById("file-input")?.click()}>
+          <label htmlFor="file-input" className="relative border-2 border-dashed border-line-border rounded-lg p-6 flex flex-col items-center justify-center hover:border-orange/50 transition-colors cursor-pointer focus-within:border-orange/70">
             <span className="text-orange font-bold text-sm mb-2">📷 Choose image</span>
-            <span className="text-xs text-muted">JPEG, PNG, WebP up to 10 MB</span>
+            <span className="text-xs text-muted">{selectedFile ? selectedFile.name : "JPEG, PNG, WebP up to 10 MB"}</span>
             <input
+              ref={fileInputRef}
               id="file-input"
               type="file"
               name="file"
               accept="image/*"
               required
-              className="hidden"
+              disabled={uploadBusy}
+              onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
-          </div>
+          </label>
           {uploadNotice && (
             <div className="p-3 rounded-lg bg-orange/10 border border-orange/20 text-orange text-sm">
               {uploadNotice}

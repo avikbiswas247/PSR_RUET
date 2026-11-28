@@ -24,7 +24,7 @@ export default function PhotographerProfilePage() {
   const [notice, setNotice] = useState("");
   const [dpPreview, setDpPreview] = useState<string | null>(null);
   const [newPhotoTitle, setNewPhotoTitle] = useState("");
-  const [editMode, setEditMode] = useState(true);
+  const [editMode, setEditMode] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalSrc, setModalSrc] = useState("");
   const [modalAlt, setModalAlt] = useState("");
@@ -449,7 +449,6 @@ export default function PhotographerProfilePage() {
                 compact
                 title="No photos yet"
                 description="Your published work will appear here. Add a photo to start building your profile gallery."
-                action={!editMode ? { label: "Upload your first photo", onClick: () => setEditMode(true) } : undefined}
               />
             </div>
           ) : (
